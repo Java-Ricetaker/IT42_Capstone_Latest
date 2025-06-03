@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Auth;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Validation\ValidationException;
@@ -34,10 +35,15 @@ class PasswordResetLinkController extends Controller
             ], 403);
         }
 
+        DB::table('password_reset_tokens')->where('email', $request->email)->delete();
+
         // Send the password reset link
         $status = Password::sendResetLink(
             $request->only('email')
         );
+
+        
+
 
         return $status === Password::RESET_LINK_SENT
             ? response()->json(['message' => __($status)])

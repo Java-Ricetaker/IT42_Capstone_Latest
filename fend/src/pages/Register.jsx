@@ -76,7 +76,7 @@ function Register() {
 
       // ✅ Redirect after 2 seconds
       setTimeout(() => {
-        navigate('/login');
+        navigate('/verify-email');
       }, 2000);
     } catch (err) {
       setMessage(err.response?.data?.message || 'Registration failed');
