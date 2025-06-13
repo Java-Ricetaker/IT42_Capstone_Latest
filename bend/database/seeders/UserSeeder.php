@@ -13,7 +13,9 @@ class UserSeeder extends Seeder
      */
     public function run(): void
     {
+        \DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         User::truncate();
+        \DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $users = [
             [
@@ -21,18 +23,6 @@ class UserSeeder extends Seeder
                 'email' => 'admin@gmail.com',
                 'password' => Hash::make('password'),
                 'role' => 'admin',
-            ],
-            [
-                'name' => 'Clinic Manager',
-                'email' => 'manager@gmail.com',
-                'password' => Hash::make('password'),
-                'role' => 'manager',
-            ],
-            [
-                'name' => 'Dr. Dentist',
-                'email' => 'dentist@gmail.com',
-                'password' => Hash::make('password'),
-                'role' => 'dentist',
             ],
             [
                 'name' => 'Frontdesk Staff',

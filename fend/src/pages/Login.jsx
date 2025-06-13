@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AuthLayout from '../layouts/AuthLayout';
@@ -10,17 +10,35 @@ function Login() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const navigate = useNavigate();
+
   const handleLogin = async (e) => {
     e.preventDefault();
 
     try {
       setLoading(true);
       await api.get('/sanctum/csrf-cookie');
-      const res = await api.post('/login', { email, password });
 
-      localStorage.setItem('token', res.data.token);
+      const res = await api.post('/api/login', { email, password });
+      console.log('Login response:', res.data);
+      const user = res.data.user || res.data; // fallback if user is at root
+
       setMessage('Login successful!');
+
+      // Delay navigation slightly to ensure session cookie is applied
+      setTimeout(() => {
+        if (user.role === 'admin') {
+          navigate('/admin');
+        } else if (user.role === 'staff') {
+          // navigate('/staff'); // placeholder
+        } else if (user.role === 'patient') {
+          // navigate('/patient'); // placeholder
+        } else {
+          setMessage('Login successful, but no dashboard yet for this role.');
+        }
+      }, 150); // small delay to let Laravel cookies finalize
     } catch (err) {
+      console.error(err);
       setMessage(err.response?.data?.message || 'Login failed');
     } finally {
       setLoading(false);

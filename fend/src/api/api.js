@@ -17,4 +17,6 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+api.logout = () => api.post('/logout');
+
 export default api;
