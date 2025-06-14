@@ -30,7 +30,7 @@ function Login() {
         if (user.role === 'admin') {
           navigate('/admin');
         } else if (user.role === 'staff') {
-          // navigate('/staff'); // placeholder
+          navigate('/staff'); // placeholder
         } else if (user.role === 'patient') {
           // navigate('/patient'); // placeholder
         } else {

@@ -24,12 +24,29 @@ const StaffDashboard = () => {
   if (!status) return <p>Loading dashboard...</p>;
 
   if (!status.approved) {
+    const wasRejected = !status.temporary_code;
+  
     return (
       <div className="alert alert-warning">
-        🚫 This device is not yet approved. Please coordinate with your admin.
+        {wasRejected ? (
+          <>
+            ❌ <strong>This device has been rejected by the admin.</strong><br />
+            If you believe this was a mistake, please contact the admin for clarification.
+          </>
+        ) : (
+          <>
+            🚫 <strong>This device is not yet approved.</strong><br />
+            Please provide the following temporary code to the admin for approval:<br />
+            <strong>Temporary Code:</strong>{" "}
+            <span className="badge bg-secondary">{status.temporary_code}</span><br />
+            <small>If you think this is a mistake, please contact the admin.</small>
+          </>
+        )}
       </div>
     );
   }
+  
+  
 
   return (
     <div>

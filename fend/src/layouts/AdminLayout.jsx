@@ -41,7 +41,7 @@ function AdminLayout() {
           </li>
           <li className="nav-item">
             <a className="nav-link text-white" href="/admin/staff-register">
-              Staff Registration
+              Create Staff Account
             </a>
           </li>
           <li className="nav-item mt-4">

@@ -18,6 +18,7 @@ import AdminStaffRegister from "../pages/Admin/StaffRegister";
 // Staff layout and pages
 import StaffLayout from "../layouts/StaffLayout";
 import StaffDashboard from "../pages/Staff/StaffDashboard";
+import StaffProfile from "../pages/Staff/StaffProfile";
 
 
 export default function AppRouter() {
@@ -43,6 +44,7 @@ export default function AppRouter() {
         {/* Staff Routes */}
         <Route path="/staff" element={<StaffLayout />}>
           <Route index element={<StaffDashboard />} />
+          <Route path="profile" element={<StaffProfile />} />
           {/* Add more staff routes as needed */}
         </Route>
       </Routes>

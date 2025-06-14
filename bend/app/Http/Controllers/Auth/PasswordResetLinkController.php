@@ -29,9 +29,9 @@ class PasswordResetLinkController extends Controller
         
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || $user->role !== 'patient') {
+        if (!$user || !in_array($user->role, ['patient', 'staff'])) {
             return response()->json([
-                'message' => 'Password reset is only available to patient accounts.'
+                'message' => 'Password reset is only available to patient or staff accounts.'
             ], 403);
         }
 

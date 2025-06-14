@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use App\Http\Middleware\AdminOnly;
 use Illuminate\Support\Facades\Route;
 use App\Http\Middleware\EnsureDeviceIsApproved;
+use App\Http\Controllers\DeviceStatusController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Admin\StaffAccountController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -41,6 +42,12 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
     Route::post('/admin/staff', [StaffAccountController::class, 'store']);
 });
 
+// Routes for logged in users
+Route::middleware('auth:sanctum')->group(function () {
+    // Staff-specific routes
+    Route::get('/device-status', [DeviceStatusController::class, 'check']);
+    Route::post('/staff/change-password', [App\Http\Controllers\Staff\StaffAccountController::class, 'changePassword']);
+});
 
 Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(function () {
     // Protected routes for approved devices of staff users

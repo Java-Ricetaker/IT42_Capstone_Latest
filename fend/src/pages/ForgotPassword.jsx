@@ -1,14 +1,22 @@
-import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import api from '../api/api';
 import AuthLayout from '../layouts/AuthLayout';
 import LoadingSpinner from '../components/LoadingSpinner';
 
 function ForgotPassword() {
+  const location = useLocation();
+  const prefillEmail = location.state?.email || '';
+  const fromProfile = location.state?.fromProfile || false;
+
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    setEmail(prefillEmail);
+  }, [prefillEmail]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,7 +44,9 @@ function ForgotPassword() {
     <AuthLayout>
       {loading && <LoadingSpinner message="Sending reset link..." />}
       <div className="card shadow-sm p-4" style={{ width: '100%', maxWidth: '500px' }}>
-        <h3 className="text-center mb-4">Forgot Password</h3>
+        <h3 className="text-center mb-4">
+          {fromProfile ? 'Send Password Reset Link' : 'Forgot Password'}
+        </h3>
 
         <form onSubmit={handleSubmit}>
           <div className="mb-3">
@@ -48,6 +58,7 @@ function ForgotPassword() {
               type="email"
               className="form-control"
               value={email}
+              readOnly={fromProfile}
               onChange={(e) => setEmail(e.target.value)}
               required
               autoComplete="email"
