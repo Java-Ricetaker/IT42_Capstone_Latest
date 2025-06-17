@@ -17,6 +17,20 @@ api.interceptors.request.use(config => {
   return config;
 });
 
+api.interceptors.response.use(
+  response => response,
+  error => {
+    const config = error.config || {};
+
+    if (error.response?.status === 401 && !config.skip401Handler) {
+      localStorage.removeItem('token');
+      window.location.href = '/';
+    }
+
+    return Promise.reject(error);
+  }
+);
+
 api.logout = () => api.post('/logout');
 
 export default api;

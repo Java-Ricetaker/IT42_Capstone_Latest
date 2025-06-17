@@ -10,22 +10,22 @@ export default function AuthRedirector() {
 
   useEffect(() => {
     const checkSession = async () => {
-      try {
-        const res = await api.get('/api/user');
-        const user = res.data;
-
-        const publicRoutes = ['/', '/login', '/register', '/forgot-password'];
-        if (publicRoutes.includes(location.pathname)) {
-          if (user.role === 'admin') navigate('/admin');
-          else if (user.role === 'staff') navigate('/staff');
-          else if (user.role === 'patient') navigate('/patient');
+        try {
+          const res = await api.get('/api/user', { skip401Handler: true });
+          const user = res.data;
+      
+          const publicRoutes = ['/', '/login', '/register', '/forgot-password'];
+          if (publicRoutes.includes(location.pathname)) {
+            if (user.role === 'admin') navigate('/admin');
+            else if (user.role === 'staff') navigate('/staff');
+            else if (user.role === 'patient') navigate('/patient');
+          }
+        } catch (err) {
+          // Not logged in — just finish check
+        } finally {
+          setChecking(false);
         }
-      } catch (err) {
-        // Not logged in
-      } finally {
-        setChecking(false); // 🟢 finish check
-      }
-    };
+      };      
 
     checkSession();
   }, [location.pathname, navigate]);
