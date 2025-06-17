@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import AuthRedirector from "../components/AuthRedirector";
 
 // Auth pages
 import Login from "../pages/Login";
@@ -14,6 +15,7 @@ import AdminDashboard from "../pages/Admin/Dashboard";
 import AdminDeviceApprovals from "../pages/Admin/DeviceApprovals";
 import AdminApprovedDevices from "../pages/Admin/ApprovedDevices";
 import AdminStaffRegister from "../pages/Admin/StaffRegister";
+import AdminProfile from "../pages/Admin/AdminProfile";
 
 // Staff layout and pages
 import StaffLayout from "../layouts/StaffLayout";
@@ -22,8 +24,10 @@ import StaffProfile from "../pages/Staff/StaffProfile";
 
 
 export default function AppRouter() {
+
   return (
     <BrowserRouter>
+      <AuthRedirector /> {/* Redirects based on auth state */}
       <Routes>
         {/* Public / Auth Routes */}
         <Route path="/" element={<Login />} />
@@ -39,6 +43,7 @@ export default function AppRouter() {
           <Route path="device-approvals" element={<AdminDeviceApprovals />} />
           <Route path="approved-devices" element={<AdminApprovedDevices />} />
           <Route path="staff-register" element={<AdminStaffRegister />} />
+          <Route path="profile" element={<AdminProfile />} />
         </Route>
 
         {/* Staff Routes */}

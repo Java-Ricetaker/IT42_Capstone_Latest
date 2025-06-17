@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import api from '../api/api';
 import LoadingSpinner from '../components/LoadingSpinner';
 import AuthLayout from '../layouts/AuthLayout';
+import { getFingerprint } from '../utils/getFingerprint'; // ✅ Import
 
 function Login() {
   const [email, setEmail] = useState('');
@@ -19,24 +20,30 @@ function Login() {
       setLoading(true);
       await api.get('/sanctum/csrf-cookie');
 
-      const res = await api.post('/api/login', { email, password });
+      const fingerprint = await getFingerprint(); // ✅ Get fingerprint
+
+      const res = await api.post('/api/login', {
+        email,
+        password,
+        device_id: fingerprint, // ✅ Optional: include if backend checks
+      });
+
       console.log('Login response:', res.data);
-      const user = res.data.user || res.data; // fallback if user is at root
+      const user = res.data.user || res.data;
 
       setMessage('Login successful!');
 
-      // Delay navigation slightly to ensure session cookie is applied
       setTimeout(() => {
         if (user.role === 'admin') {
           navigate('/admin');
         } else if (user.role === 'staff') {
-          navigate('/staff'); // placeholder
+          navigate('/staff');
         } else if (user.role === 'patient') {
-          // navigate('/patient'); // placeholder
+          // navigate('/patient'); // not implemented yet
         } else {
           setMessage('Login successful, but no dashboard yet for this role.');
         }
-      }, 150); // small delay to let Laravel cookies finalize
+      }, 150);
     } catch (err) {
       console.error(err);
       setMessage(err.response?.data?.message || 'Login failed');

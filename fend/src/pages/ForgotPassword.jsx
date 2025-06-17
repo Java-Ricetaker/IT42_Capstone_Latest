@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import api from '../api/api';
 import AuthLayout from '../layouts/AuthLayout';
 import LoadingSpinner from '../components/LoadingSpinner';
+import { getFingerprint } from '../utils/getFingerprint'; // ✅ import utility
 
 function ForgotPassword() {
   const location = useLocation();
@@ -27,8 +28,11 @@ function ForgotPassword() {
       setLoading(true);
       await api.get('/sanctum/csrf-cookie');
 
+      const fingerprint = await getFingerprint(); // ✅ retrieve fingerprint
+
       const res = await api.post('/forgot-password', {
         email: email,
+        device_id: fingerprint, // ✅ send fingerprint to backend
       });
 
       setMessage(res.data.message || 'Reset link sent to your email.');

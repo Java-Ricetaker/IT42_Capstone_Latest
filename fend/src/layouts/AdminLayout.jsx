@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import api from "../api/api";
-import './AdminLayout.css'; 
+import './AdminLayout.css';
 
 function AdminLayout() {
   const navigate = useNavigate();
@@ -26,22 +26,27 @@ function AdminLayout() {
         <ul className="nav flex-column">
           <li className="nav-item">
             <a className="nav-link text-white" href="/admin">
-              Dashboard
+              🏠 Dashboard
             </a>
           </li>
           <li className="nav-item">
             <a className="nav-link text-white" href="/admin/device-approvals">
-              Device Approvals
+              🔑 Device Approvals
             </a>
           </li>
           <li className="nav-item">
             <a className="nav-link text-white" href="/admin/approved-devices">
-              Approved Devices
+              ✅ Approved Devices
             </a>
           </li>
           <li className="nav-item">
             <a className="nav-link text-white" href="/admin/staff-register">
-              Create Staff Account
+              👥 Create Staff Account
+            </a>
+          </li>
+          <li className="nav-item">
+            <a className="nav-link text-white" href="/admin/profile">
+              👤 Account
             </a>
           </li>
           <li className="nav-item mt-4">

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../api/api";
+import { getFingerprint } from "../../utils/getFingerprint"; // ✅ import utility
 
 const StaffDashboard = () => {
   const [status, setStatus] = useState(null);
@@ -7,11 +8,14 @@ const StaffDashboard = () => {
   useEffect(() => {
     const checkDevice = async () => {
       try {
+        const fingerprint = await getFingerprint(); // ✅ safely fetch or generate
+
         const res = await api.get("/api/device-status", {
           headers: {
-            "X-Device-Fingerprint": localStorage.getItem("fingerprint"),
+            "X-Device-Fingerprint": fingerprint,
           },
         });
+
         setStatus(res.data);
       } catch (err) {
         console.error("Device check failed", err);
@@ -25,7 +29,7 @@ const StaffDashboard = () => {
 
   if (!status.approved) {
     const wasRejected = !status.temporary_code;
-  
+
     return (
       <div className="alert alert-warning">
         {wasRejected ? (
@@ -45,8 +49,6 @@ const StaffDashboard = () => {
       </div>
     );
   }
-  
-  
 
   return (
     <div>
