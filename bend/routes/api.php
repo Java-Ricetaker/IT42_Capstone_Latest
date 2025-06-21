@@ -3,8 +3,10 @@
 use Illuminate\Http\Request;
 use App\Http\Middleware\AdminOnly;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\ServiceController;
 use App\Http\Middleware\EnsureDeviceIsApproved;
 use App\Http\Controllers\DeviceStatusController;
+use App\Http\Controllers\API\ServiceDiscountController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Admin\StaffAccountController;
 use App\Http\Controllers\Auth\RegisteredUserController;
@@ -40,6 +42,22 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
 
     // Staff account management
     Route::post('/admin/staff', [StaffAccountController::class, 'store']);
+
+    // Service management
+    Route::post('/services', [ServiceController::class, 'store']);
+    Route::put('/services/{service}', [ServiceController::class, 'update']);
+    Route::delete('/services/{service}', [ServiceController::class, 'destroy']);
+
+    // Service discount management
+    Route::get('/services/{service}/discounts', [ServiceDiscountController::class, 'index']);
+    Route::post('/services/{service}/discounts', [ServiceDiscountController::class, 'store']);
+    Route::put('/discounts/{id}', [ServiceDiscountController::class, 'update']);
+    //Route::delete('/discounts/{id}', [ServiceDiscountController::class, 'destroy']);
+    Route::post('/discounts/{id}/launch', [ServiceDiscountController::class, 'launch']);
+    Route::post('/discounts/{id}/cancel', [ServiceDiscountController::class, 'cancel']);
+    Route::get('/discounts-overview', [ServiceDiscountController::class, 'allActivePromos']);
+        // 📚 Promo Logs / Archive
+    Route::get('/discounts-archive', [ServiceDiscountController::class, 'archive']);
 });
 
 // Routes for logged in users
@@ -53,3 +71,6 @@ Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(functi
     // Protected routes for approved devices of staff users
 });
 
+// API routes for services
+Route::middleware('auth:sanctum')->get('/services', [ServiceController::class, 'index']);
+Route::middleware('auth:sanctum')->get('/services/{service}', [ServiceController::class, 'show']);

@@ -1,6 +1,6 @@
 import { Outlet, useNavigate } from "react-router-dom";
 import api from "../api/api";
-import './AdminLayout.css';
+import "./AdminLayout.css";
 
 function AdminLayout() {
   const navigate = useNavigate();
@@ -42,6 +42,21 @@ function AdminLayout() {
           <li className="nav-item">
             <a className="nav-link text-white" href="/admin/staff-register">
               👥 Create Staff Account
+            </a>
+          </li>
+          <li className="nav-item">
+            <a className="nav-link text-white" href="/admin/services">
+              🦷 Manage Services
+            </a>
+          </li>
+          <li className="nav-item">
+            <a className="nav-link text-white" href="/admin/service-discounts">
+              💸 Service Promos
+            </a>
+          </li>
+          <li className="nav-item">
+            <a className="nav-link text-white" href="/admin/promo-archive">
+              📁 Promo Archive
             </a>
           </li>
           <li className="nav-item">

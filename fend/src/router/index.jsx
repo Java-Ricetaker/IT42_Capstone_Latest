@@ -16,6 +16,9 @@ import AdminDeviceApprovals from "../pages/Admin/DeviceApprovals";
 import AdminApprovedDevices from "../pages/Admin/ApprovedDevices";
 import AdminStaffRegister from "../pages/Admin/StaffRegister";
 import AdminProfile from "../pages/Admin/AdminProfile";
+import AdminServices from "../pages/Admin/ServiceManager"; 
+import ServiceDiscountManager from "../pages/Admin/ServiceDiscountManager";
+import PromoArchive from "../pages/Admin/PromoArchive";
 
 // Staff layout and pages
 import StaffLayout from "../layouts/StaffLayout";
@@ -44,6 +47,10 @@ export default function AppRouter() {
           <Route path="approved-devices" element={<AdminApprovedDevices />} />
           <Route path="staff-register" element={<AdminStaffRegister />} />
           <Route path="profile" element={<AdminProfile />} />
+          <Route path="services" element={<AdminServices />} />
+          <Route path="service-discounts" element={<ServiceDiscountManager />} />
+          <Route path="promo-archive" element={<PromoArchive />} />
+          {/* Add more admin routes as needed */}
         </Route>
 
         {/* Staff Routes */}
