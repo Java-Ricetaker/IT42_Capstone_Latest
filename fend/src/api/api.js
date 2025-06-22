@@ -4,6 +4,7 @@ const api = axios.create({
   baseURL: 'https://d1db-149-30-138-246.ngrok-free.app',//'http://127.0.0.1:8000', // ✅ Match exactly with browser origin
   withCredentials: true,
   headers: {
+    "ngrok-skip-browser-warning": "true",
     'X-Requested-With': 'XMLHttpRequest',
   }
 });
