@@ -1,16 +1,15 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://d1db-149-30-138-246.ngrok-free.app',//'http://127.0.0.1:8000', // ✅ Match exactly with browser origin
+  baseURL: 'https://d1db-149-30-138-246.ngrok-free.app',
   withCredentials: true,
   headers: {
     'X-Requested-With': 'XMLHttpRequest',
-  }
+  },
 });
 
-axios.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
+api.defaults.headers.common['ngrok-skip-browser-warning'] = 'true';
 
-// 🩹 Inject X-XSRF-TOKEN manually from cookie if needed
 api.interceptors.request.use(config => {
   const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
   if (match) {
@@ -20,9 +19,15 @@ api.interceptors.request.use(config => {
 });
 
 api.interceptors.response.use(
-  response => response,
-  error => {
+  res => res,
+  async error => {
     const config = error.config || {};
+
+    if (error.response?.status === 419 && !config._retry) {
+      config._retry = true;
+      await api.get('/sanctum/csrf-cookie');
+      return api(config);
+    }
 
     if (error.response?.status === 401 && !config.skip401Handler) {
       localStorage.removeItem('token');
