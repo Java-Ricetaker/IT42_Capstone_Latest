@@ -18,7 +18,7 @@ return new class extends Migration {
             $table->decimal('discounted_price', 8, 2);
             $table->enum('status', ['planned', 'launched', 'canceled', 'done'])->default('planned');
             $table->timestamp('activated_at')->nullable();
-
+            $table->boolean('is_analytics_linked')->default(false); // to track which promos to include in usage reports
             $table->timestamps();
 
             $table->index(['start_date', 'end_date']);

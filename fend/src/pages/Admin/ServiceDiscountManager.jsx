@@ -73,7 +73,7 @@ export default function ServiceDiscountManager() {
     await api.post(`/api/discounts/${id}/cancel`);
     loadPromos(selectedService);
   };
-
+  const selected = services.find((s) => s.id === Number(selectedService));
   const openPromoCreation = () => setShowServiceModal(true);
 
   const selectService = (serviceId) => {
@@ -123,11 +123,23 @@ export default function ServiceDiscountManager() {
       {selectedService ? (
         <>
           {/* Promo creation section */}
+
           <div className="alert alert-info">
-            Creating promo for:{" "}
-            <strong>
-              {services.find((s) => s.id === Number(selectedService))?.name}
-            </strong>
+            Creating promo for: <strong>{selected?.name}</strong>
+            <br />
+            {selected?.category && (
+              <span className="text-muted">
+                🏷️ Category: <strong>{selected.category}</strong>
+              </span>
+            )}
+            {selected?.is_excluded_from_analytics ? (
+              <>
+                <br />
+                <span className="badge bg-secondary">
+                  🔒 Excluded from analytics
+                </span>
+              </>
+            ) : null}
           </div>
 
           <div className="row g-3 align-items-end mb-3">

@@ -12,6 +12,8 @@ export default function ServiceManager() {
     name: "",
     description: "",
     price: "",
+    category: "",
+    is_excluded_from_analytics: false,
   });
   const [isEditMode, setIsEditMode] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -32,7 +34,11 @@ export default function ServiceManager() {
   };
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, type, checked, value } = e.target;
+    setFormData({
+      ...formData,
+      [name]: type === "checkbox" ? checked : value,
+    });
   };
 
   const handleDelete = (service) => {
@@ -67,7 +73,13 @@ export default function ServiceManager() {
   };
 
   const resetForm = () => {
-    setFormData({ name: "", description: "", price: "" });
+    setFormData({
+      name: "",
+      description: "",
+      price: "",
+      category: "",
+      is_excluded_from_analytics: false,
+    });
     setIsEditMode(false);
     setEditingId(null);
   };
@@ -77,6 +89,8 @@ export default function ServiceManager() {
       name: service.name,
       description: service.description,
       price: service.price,
+      category: service.category || "",
+      is_excluded_from_analytics: service.is_excluded_from_analytics || false,
     });
     setEditingId(service.id);
     setIsEditMode(true);
@@ -102,6 +116,8 @@ export default function ServiceManager() {
               <th>Name</th>
               <th>Description</th>
               <th>Price (₱)</th>
+              <th>Category</th>
+              <th>Analytics</th>
               <th className="text-center">Actions</th>
             </tr>
           </thead>
@@ -111,6 +127,8 @@ export default function ServiceManager() {
                 <td>{service.name}</td>
                 <td>{service.description}</td>
                 <td>{Number(service.price).toFixed(2)}</td>
+                <td>{service.category || "-"}</td>
+                <td>{service.is_excluded_from_analytics ? "Excluded" : "Included"}</td>
                 <td className="text-center">
                   <button
                     className="btn btn-sm btn-success me-2"
@@ -184,6 +202,36 @@ export default function ServiceManager() {
                     onChange={handleChange}
                     required
                   />
+                </div>
+                <div className="mb-3">
+                  <label className="form-label">Category</label>
+                  <select
+                    name="category"
+                    className="form-select"
+                    value={formData.category}
+                    onChange={handleChange}
+                  >
+                    <option value="">-- Select Category --</option>
+                    <option value="Preventive">Preventive</option>
+                    <option value="Restorative">Restorative</option>
+                    <option value="Cosmetic">Cosmetic</option>
+                    <option value="Surgical">Surgical</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div className="form-check mb-3">
+                  <input
+                    className="form-check-input"
+                    type="checkbox"
+                    id="excludeAnalytics"
+                    name="is_excluded_from_analytics"
+                    checked={formData.is_excluded_from_analytics}
+                    onChange={handleChange}
+                  />
+                  <label className="form-check-label" htmlFor="excludeAnalytics">
+                    Exclude from analytics
+                    <br /><small className="text-muted">Used to hide situational services like dentures from charts and usage-based reports.</small>
+                  </label>
                 </div>
               </div>
               <div className="modal-footer">

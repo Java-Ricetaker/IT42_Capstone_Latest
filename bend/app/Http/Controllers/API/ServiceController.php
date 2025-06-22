@@ -25,6 +25,8 @@ class ServiceController extends Controller
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
+            'category' => 'nullable|string|max:255',
+            'is_excluded_from_analytics' => 'boolean',
         ]);
 
         $service = Service::create($data);
@@ -50,6 +52,8 @@ class ServiceController extends Controller
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|required|numeric|min:0',
+            'category' => 'nullable|string|max:255',
+            'is_excluded_from_analytics' => 'boolean',
         ]);
 
         $service->update($data);
