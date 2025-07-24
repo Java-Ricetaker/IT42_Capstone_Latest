@@ -19,6 +19,9 @@ import AdminProfile from "../pages/Admin/AdminProfile";
 import AdminServices from "../pages/Admin/ServiceManager"; 
 import ServiceDiscountManager from "../pages/Admin/ServiceDiscountManager";
 import PromoArchive from "../pages/Admin/PromoArchive";
+import ScheduleManager from "../pages/Admin/ScheduleManager";
+
+import ClinicCalendarManager from "../pages/Admin/ClinicCalendarManager";
 
 // Staff layout and pages
 import StaffLayout from "../layouts/StaffLayout";
@@ -50,6 +53,10 @@ export default function AppRouter() {
           <Route path="services" element={<AdminServices />} />
           <Route path="service-discounts" element={<ServiceDiscountManager />} />
           <Route path="promo-archive" element={<PromoArchive />} />
+          <Route path="schedule" element={<ScheduleManager />} />
+
+
+          <Route path="clinic-calendar" element={<ClinicCalendarManager />} />
           {/* Add more admin routes as needed */}
         </Route>
 

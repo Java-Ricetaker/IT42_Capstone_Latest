@@ -17,6 +17,10 @@ return new class extends Migration {
             $table->decimal('price', 10, 2);
             $table->string('category')->nullable(); // e.g., Preventive, Surgical
             $table->boolean('is_excluded_from_analytics')->default(false);
+            $table->boolean('is_special')->default(false);
+            $table->date('special_start_date')->nullable();
+            $table->date('special_end_date')->nullable();
+            $table->integer('estimated_minutes');
             $table->timestamps();
         });
     }

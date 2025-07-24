@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
             UserSeeder::class,
             ServiceSeeder::class,
             ServiceDiscountSeeder::class,
+            ClinicWeeklyScheduleSeeder::class,
             // Add other seeders here as needed
         ]);
     }

@@ -1,6 +1,6 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import api from "../api/api";
-import './StaffLayout.css';
+import "./StaffLayout.css";
 
 function StaffLayout() {
   const navigate = useNavigate();
@@ -18,12 +18,41 @@ function StaffLayout() {
   return (
     <div className="d-flex">
       {/* Sidebar */}
-      <div className="bg-light p-3 border-end" style={{ width: "220px", minHeight: "100vh" }}>
+      <div
+        className="bg-light p-3 border-end"
+        style={{ width: "220px", minHeight: "100vh" }}
+      >
         <h5>Staff Menu</h5>
         <ul className="nav flex-column">
-          <li><a href="/staff" className="nav-link">🏠 Dashboard</a></li>
-          <li><a href="/staff/profile" className="nav-link">👤 Account</a></li>
-          <li><button onClick={handleLogout} className="btn btn-outline-danger w-100 mt-4">Logout</button></li>
+          <li className="nav-item">
+            <NavLink
+              to="/staff"
+              end
+              className={({ isActive }) =>
+                "nav-link" + (isActive ? " fw-bold text-primary" : "")
+              }
+            >
+              🏠 Dashboard
+            </NavLink>
+          </li>
+          <li className="nav-item">
+            <NavLink
+              to="/staff/profile"
+              className={({ isActive }) =>
+                "nav-link" + (isActive ? " fw-bold text-primary" : "")
+              }
+            >
+              👤 Account
+            </NavLink>
+          </li>
+          <li className="nav-item mt-4">
+            <button
+              onClick={handleLogout}
+              className="btn btn-outline-danger w-100"
+            >
+              🚪 Logout
+            </button>
+          </li>
         </ul>
       </div>
 

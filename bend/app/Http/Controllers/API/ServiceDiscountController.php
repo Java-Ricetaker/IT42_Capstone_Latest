@@ -2,22 +2,23 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
-use Illuminate\Http\Request;
-use App\Models\Service;
-use App\Models\ServiceDiscount;
 use Carbon\Carbon;
+use App\Models\Service;
+use Illuminate\Http\Request;
+use App\Models\ServiceDiscount;
+use App\Http\Controllers\Controller;
+use App\Services\ClinicDateResolverService;
 
 class ServiceDiscountController extends Controller
 {
     public function index(Service $service)
     {
-        // 🟡 Mark expired launched promos as 'done'
+        // Mark expired launched promos as 'done'
         $cleanupCount = ServiceDiscount::where('status', 'launched')
             ->whereDate('end_date', '<', Carbon::today())
             ->update(['status' => 'done']);
 
-        // 🟢 Return active promos and cleanup count
+        // Return active promos and cleanup count
         return response()->json([
             'cleanup_count' => $cleanupCount,
             'promos' => $service->discounts()
@@ -35,6 +36,7 @@ class ServiceDiscountController extends Controller
             'discounted_price' => 'required|numeric|min:0|max:' . $service->price,
         ]);
 
+        // Check for overlapping promos
         $overlap = $service->discounts()
             ->where(function ($q) use ($validated) {
                 $q->whereBetween('start_date', [$validated['start_date'], $validated['end_date']])
@@ -53,9 +55,38 @@ class ServiceDiscountController extends Controller
             ], 422);
         }
 
+        // Check clinic open days in range
+        $openDates = ClinicDateResolverService::getOpenDaysInRange(
+            $validated['start_date'],
+            $validated['end_date']
+        );
+
+        if (count($openDates) === 0) {
+            return response()->json([
+                'message' => 'Cannot create promo — all selected dates are clinic closed.',
+            ], 422);
+        }
+
         $discount = $service->discounts()->create($validated);
-        return response()->json($discount, 201);
+
+        $response = response()->json($discount, 201);
+
+        // Optional warning: partial closure
+        $totalDays = Carbon::parse($validated['start_date'])
+            ->diffInDays(Carbon::parse($validated['end_date'])) + 1;
+
+        $closedDays = $totalDays - count($openDates);
+
+        if ($closedDays > 0) {
+            $response->setContent(json_encode([
+                'promo' => $discount,
+                'warning' => "$closedDays day(s) in the selected range are clinic closed and will have no effect.",
+            ]));
+        }
+
+        return $response;
     }
+
 
     public function update(Request $request, $id)
     {

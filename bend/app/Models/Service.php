@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\ServiceBundleItem;
 use Illuminate\Database\Eloquent\Model;
 
 class Service extends Model
@@ -11,9 +12,12 @@ class Service extends Model
         'description',
         'price',
         'category',
-        'is_excluded_from_analytics'
+        'is_excluded_from_analytics',
+        'is_special',
+        'special_start_date',
+        'special_end_date',
+        'estimated_minutes',
     ];
-
 
     public function discounts()
     {
@@ -31,4 +35,26 @@ class Service extends Model
 
         return $discount ? $discount->discounted_price : $this->price;
     }
+
+    public function isCurrentlyActiveSpecial(): bool
+    {
+        if (!$this->is_special)
+            return false;
+
+        $today = now()->toDateString();
+
+        return $this->special_start_date <= $today && $this->special_end_date >= $today;
+    }
+
+    public function bundleItems()
+    {
+        return $this->hasMany(ServiceBundleItem::class, 'parent_service_id');
+    }
+
+    public function bundledServices()
+    {
+        return $this->belongsToMany(Service::class, 'service_bundle_items', 'parent_service_id', 'child_service_id');
+    }
+
+
 }

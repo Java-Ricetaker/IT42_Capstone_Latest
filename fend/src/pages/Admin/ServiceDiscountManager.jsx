@@ -42,22 +42,41 @@ export default function ServiceDiscountManager() {
 
   const savePromo = async () => {
     setLoading(true);
+    setErrors({});
     try {
       if (editMode && editingPromoId) {
         await api.put(`/api/discounts/${editingPromoId}`, form);
       } else {
-        await api.post(`/api/services/${selectedService}/discounts`, form);
+        const res = await api.post(
+          `/api/services/${selectedService}/discounts`,
+          form
+        );
+
+        if (res.data.warning) {
+          alert(
+            `⚠ Promo saved, but some dates are clinic closed:\n${res.data.warning}`
+          );
+        }
       }
+
+      // Only reset after successful save
       setForm({ start_date: "", end_date: "", discounted_price: "" });
-      setErrors({});
       setEditMode(false);
       setEditingPromoId(null);
-      loadPromos(selectedService);
+      await loadPromos(selectedService);
     } catch (err) {
       if (err.response?.status === 422) {
-        setErrors(
-          err.response.data.errors || { message: err.response.data.message }
-        );
+        const message = err.response.data.message;
+        const fieldErrors = err.response.data.errors;
+
+        if (message?.includes("clinic closed")) {
+          alert(`❌ Cannot save promo: ${message}`);
+          return; // stop here, don't reset form
+        }
+
+        setErrors(fieldErrors || { message });
+      } else {
+        console.error("Unknown error", err);
       }
     } finally {
       setLoading(false);
@@ -116,9 +135,17 @@ export default function ServiceDiscountManager() {
         </div>
       )}
 
-      <button className="btn btn-primary mb-3" onClick={openPromoCreation}>
-        + Make Promo
-      </button>
+      <div className="mb-3">
+        <button className="btn btn-primary me-2" onClick={openPromoCreation}>
+          + Make Promo
+        </button>
+        <span
+          className="text-muted"
+          title="Services marked as Special/Package are excluded from discounts."
+        >
+          ⓘ Specials/Packages cannot be discounted
+        </span>
+      </div>
 
       {selectedService ? (
         <>
@@ -179,7 +206,7 @@ export default function ServiceDiscountManager() {
               </button>
             </div>
             {errors.message && (
-              <div className="text-danger mt-2">{errors.message}</div>
+              <div className="alert alert-danger mt-2">❌ {errors.message}</div>
             )}
           </div>
 
@@ -262,7 +289,7 @@ export default function ServiceDiscountManager() {
       {/* Modals from shared component */}
       <ServiceSelectModal
         show={showServiceModal}
-        services={services}
+        services={services.filter((s) => !s.is_special)}
         onSelect={selectService}
         onClose={() => setShowServiceModal(false)}
       />

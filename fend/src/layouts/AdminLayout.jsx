@@ -1,4 +1,4 @@
-import { Outlet, useNavigate } from "react-router-dom";
+import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import api from "../api/api";
 import "./AdminLayout.css";
 
@@ -25,44 +25,95 @@ function AdminLayout() {
         <h4>Admin Panel</h4>
         <ul className="nav flex-column">
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin">
+            <NavLink
+              to="/admin"
+              end
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               🏠 Dashboard
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin/device-approvals">
+            <NavLink
+              to="/admin/device-approvals"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               🔑 Device Approvals
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin/approved-devices">
+            <NavLink
+              to="/admin/approved-devices"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               ✅ Approved Devices
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin/staff-register">
+            <NavLink
+              to="/admin/staff-register"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               👥 Create Staff Account
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin/services">
+            <NavLink
+              to="/admin/schedule"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
+              📆 Clinic Schedule
+            </NavLink>
+          </li>
+          <li className="nav-item">
+            <NavLink
+              to="/admin/services"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               🦷 Manage Services
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin/service-discounts">
+            <NavLink
+              to="/admin/service-discounts"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               💸 Service Promos
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin/promo-archive">
+            <NavLink
+              to="/admin/promo-archive"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               📁 Promo Archive
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item">
-            <a className="nav-link text-white" href="/admin/profile">
+            <NavLink
+              to="/admin/profile"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
               👤 Account
-            </a>
+            </NavLink>
           </li>
           <li className="nav-item mt-4">
             <button

@@ -13,7 +13,7 @@ class ServiceController extends Controller
      */
     public function index()
     {
-        return response()->json(Service::all());
+        return response()->json(Service::with('bundledServices')->get());
     }
 
     /**
@@ -21,16 +21,31 @@ class ServiceController extends Controller
      */
     public function store(Request $request)
     {
-        $data = $request->validate([
+        $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'required|numeric|min:0',
-            'category' => 'nullable|string|max:255',
+            'category' => 'required|string|max:255',
             'is_excluded_from_analytics' => 'boolean',
+            'is_special' => 'boolean',
+            'special_start_date' => 'nullable|date',
+            'special_end_date' => 'nullable|date|after_or_equal:special_start_date',
+            'estimated_minutes' => 'required|integer|min:1',
+            'bundled_service_ids' => 'array',
+            'bundled_service_ids.*' => 'exists:services,id',
         ]);
 
-        $service = Service::create($data);
-        return response()->json($service, 201);
+        // Round up estimated time to nearest 30 mins
+        $validated['estimated_minutes'] = ceil($validated['estimated_minutes'] / 30) * 30;
+
+        $service = Service::create($validated);
+
+        // Sync bundled services (if any)
+        if ($request->has('bundled_service_ids')) {
+            $service->bundledServices()->sync($request->input('bundled_service_ids'));
+        }
+
+        return response()->json($service->load('bundledServices'), 201);
     }
 
     /**
@@ -38,7 +53,7 @@ class ServiceController extends Controller
      */
     public function show(string $id)
     {
-        return response()->json(Service::findOrFail($id));
+        return response()->json(Service::with('bundledServices')->findOrFail($id));
     }
 
     /**
@@ -48,16 +63,32 @@ class ServiceController extends Controller
     {
         $service = Service::findOrFail($id);
 
-        $data = $request->validate([
+        $validated = $request->validate([
             'name' => 'sometimes|required|string|max:255',
             'description' => 'nullable|string',
             'price' => 'sometimes|required|numeric|min:0',
             'category' => 'nullable|string|max:255',
             'is_excluded_from_analytics' => 'boolean',
+            'is_special' => 'boolean',
+            'special_start_date' => 'nullable|date',
+            'special_end_date' => 'nullable|date|after_or_equal:special_start_date',
+            'estimated_minutes' => 'sometimes|required|integer|min:1',
+            'bundled_service_ids' => 'array',
+            'bundled_service_ids.*' => 'exists:services,id',
         ]);
 
-        $service->update($data);
-        return response()->json($service);
+        if (isset($validated['estimated_minutes'])) {
+            $validated['estimated_minutes'] = ceil($validated['estimated_minutes'] / 30) * 30;
+        }
+
+        $service->update($validated);
+
+        // Sync bundled services
+        if ($request->has('bundled_service_ids')) {
+            $service->bundledServices()->sync($request->input('bundled_service_ids'));
+        }
+
+        return response()->json($service->load('bundledServices'));
     }
 
     /**
