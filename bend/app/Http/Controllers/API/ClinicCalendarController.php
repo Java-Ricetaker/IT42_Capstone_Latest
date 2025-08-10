@@ -112,4 +112,29 @@ class ClinicCalendarController extends Controller
             'error' => 'No schedule found for the given date.',
         ], 404);
     }
+
+    public static function smartResolveDate(string $date): array
+    {
+        $carbon = Carbon::parse($date);
+        $day = $carbon->format('l'); // e.g., 'Monday'
+
+        $calendar = ClinicCalendar::where('date', $date)->first();
+        if ($calendar) {
+            return [
+                'is_open' => $calendar->is_open,
+                'opening_time' => $calendar->opening_time,
+                'closing_time' => $calendar->closing_time,
+                'dentist_count' => $calendar->dentist_count,
+            ];
+        }
+
+        $weekly = ClinicWeeklySchedule::where('weekday', $carbon->dayOfWeek)->first();
+        return [
+            'is_open' => $weekly->is_open,
+            'opening_time' => $weekly->open_time,
+            'closing_time' => $weekly->close_time,
+            'dentist_count' => $weekly->dentist_count,
+        ];
+    }
+
 }

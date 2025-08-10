@@ -35,6 +35,29 @@ function StaffLayout() {
               🏠 Dashboard
             </NavLink>
           </li>
+
+          <li className="nav-item">
+            <NavLink
+              to="/staff/appointments"
+              className={({ isActive }) =>
+                "nav-link" + (isActive ? " fw-bold text-primary" : "")
+              }
+            >
+              📅 Appointments
+            </NavLink>
+          </li>
+
+          <li className="nav-item">
+            <NavLink
+              to="/staff/appointment-reminders"
+              className={({ isActive }) =>
+                "nav-link" + (isActive ? " fw-bold text-primary" : "")
+              }
+            >
+              🔔 Reminders
+            </NavLink>
+          </li>
+
           <li className="nav-item">
             <NavLink
               to="/staff/profile"
@@ -45,6 +68,7 @@ function StaffLayout() {
               👤 Account
             </NavLink>
           </li>
+
           <li className="nav-item mt-4">
             <button
               onClick={handleLogout}

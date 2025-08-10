@@ -1,0 +1,36 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+
+class Appointment extends Model
+{
+    use HasFactory;
+
+    protected $fillable = [
+        'patient_id',
+        'service_id',
+        'date',
+        'time_slot',
+        'reference_code',
+        'status',
+        'payment_method',
+        'payment_status',
+        'notes',
+    ];
+
+    public function patient()
+    {
+        return $this->belongsTo(Patient::class);
+    }
+
+    public function service()
+    {
+        return $this->belongsTo(Service::class);
+    }
+
+    
+
+}

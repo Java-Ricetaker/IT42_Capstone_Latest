@@ -136,11 +136,33 @@ class ServiceDiscountController extends Controller
 
 
     // 🟢 Launch promo
+    // 🟢 Launch promo
     public function launch($id)
     {
         $discount = ServiceDiscount::findOrFail($id);
+
         if ($discount->status !== 'planned') {
             return response()->json(['message' => 'Promo must be in planned state to launch.'], 422);
+        }
+
+        // Check for overlapping launched promos of the same service
+        $overlap = $discount->service->discounts()
+            ->where('id', '!=', $discount->id)
+            ->where('status', 'launched')
+            ->where(function ($q) use ($discount) {
+                $q->whereBetween('start_date', [$discount->start_date, $discount->end_date])
+                    ->orWhereBetween('end_date', [$discount->start_date, $discount->end_date])
+                    ->orWhere(function ($q2) use ($discount) {
+                        $q2->where('start_date', '<=', $discount->start_date)
+                            ->where('end_date', '>=', $discount->end_date);
+                    });
+            })
+            ->exists();
+
+        if ($overlap) {
+            return response()->json([
+                'message' => 'Cannot launch — another launched promo overlaps this date range.',
+            ], 422);
         }
 
         $discount->status = 'launched';
@@ -149,6 +171,7 @@ class ServiceDiscountController extends Controller
 
         return response()->json(['message' => 'Promo launched.']);
     }
+
 
     // 🟡 Cancel promo
     public function cancel($id)

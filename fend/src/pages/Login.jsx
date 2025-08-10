@@ -39,7 +39,7 @@ function Login() {
         } else if (user.role === 'staff') {
           navigate('/staff');
         } else if (user.role === 'patient') {
-          // navigate('/patient'); // not implemented yet
+          navigate('/patient');
         } else {
           setMessage('Login successful, but no dashboard yet for this role.');
         }

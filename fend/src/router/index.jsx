@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthRedirector from "../components/AuthRedirector";
 
+import LandingPage from "../pages/LandingPage";
+
 // Auth pages
 import Login from "../pages/Login";
 import Register from "../pages/Register";
@@ -16,27 +18,33 @@ import AdminDeviceApprovals from "../pages/Admin/DeviceApprovals";
 import AdminApprovedDevices from "../pages/Admin/ApprovedDevices";
 import AdminStaffRegister from "../pages/Admin/StaffRegister";
 import AdminProfile from "../pages/Admin/AdminProfile";
-import AdminServices from "../pages/Admin/ServiceManager"; 
+import AdminServices from "../pages/Admin/ServiceManager";
 import ServiceDiscountManager from "../pages/Admin/ServiceDiscountManager";
 import PromoArchive from "../pages/Admin/PromoArchive";
 import ScheduleManager from "../pages/Admin/ScheduleManager";
-
 import ClinicCalendarManager from "../pages/Admin/ClinicCalendarManager";
 
 // Staff layout and pages
 import StaffLayout from "../layouts/StaffLayout";
 import StaffDashboard from "../pages/Staff/StaffDashboard";
 import StaffProfile from "../pages/Staff/StaffProfile";
+import StaffAppointmentManager from "../pages/Staff/StaffAppointmentManager"; // Appointment management
+import AppointmentReminders from "../pages/Staff/AppointmentReminders";
 
+// Patient layout and pages
+import PatientLayout from "../layouts/PatientLayout";
+import BookAppointment from "../pages/Patient/BookAppointment"; 
+import PatientProfile from "../pages/Patient/PatientProfile"; 
+import PatientAppointments from "../pages/Patient/PatientAppointments"; 
 
 export default function AppRouter() {
-
   return (
     <BrowserRouter>
       <AuthRedirector /> {/* Redirects based on auth state */}
       <Routes>
         {/* Public / Auth Routes */}
-        <Route path="/" element={<Login />} />
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/password-reset/:token" element={<ResetPassword />} />
@@ -51,10 +59,12 @@ export default function AppRouter() {
           <Route path="staff-register" element={<AdminStaffRegister />} />
           <Route path="profile" element={<AdminProfile />} />
           <Route path="services" element={<AdminServices />} />
-          <Route path="service-discounts" element={<ServiceDiscountManager />} />
+          <Route
+            path="service-discounts"
+            element={<ServiceDiscountManager />}
+          />
           <Route path="promo-archive" element={<PromoArchive />} />
           <Route path="schedule" element={<ScheduleManager />} />
-
 
           <Route path="clinic-calendar" element={<ClinicCalendarManager />} />
           {/* Add more admin routes as needed */}
@@ -64,8 +74,20 @@ export default function AppRouter() {
         <Route path="/staff" element={<StaffLayout />}>
           <Route index element={<StaffDashboard />} />
           <Route path="profile" element={<StaffProfile />} />
+          <Route path="appointments" element={<StaffAppointmentManager />} />
+          <Route path="appointment-reminders" element={<AppointmentReminders />} />
           {/* Add more staff routes as needed */}
         </Route>
+
+        {/* Patient Routes */}
+        <Route path="/patient" element={<PatientLayout />}>
+          <Route path="appointment" element={<BookAppointment />} />
+          <Route path="profile" element={<PatientProfile />} />
+          <Route path="appointments" element={<PatientAppointments />} />
+
+        </Route>
+        {/* Catch-all for 404 */}
+        <Route path="*" element={<div>404 Not Found</div>} />
       </Routes>
     </BrowserRouter>
   );

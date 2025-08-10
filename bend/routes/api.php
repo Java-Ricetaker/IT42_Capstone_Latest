@@ -3,15 +3,20 @@
 use Illuminate\Http\Request;
 use App\Http\Middleware\AdminOnly;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\API\PatientController;
 use App\Http\Controllers\API\ServiceController;
+use App\Http\Controllers\API\AppointmentController;
 use App\Http\Middleware\EnsureDeviceIsApproved;
 use App\Http\Controllers\DeviceStatusController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Admin\StaffAccountController;
 use App\Http\Controllers\API\ClinicCalendarController;
+use App\Http\Controllers\Staff\PatientVisitController;
+use App\Http\Controllers\API\AppointmentSlotController;
 use App\Http\Controllers\API\ServiceDiscountController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Admin\DeviceApprovalController;
+use App\Http\Controllers\API\AppointmentServiceController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\API\ClinicWeeklyScheduleController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -28,7 +33,20 @@ Route::post('/forgot-password', [PasswordResetLinkController::class, 'store']);
 Route::post('/reset-password', [NewPasswordController::class, 'store']);
 
 // Authenticated user fetch
-Route::middleware('auth:sanctum')->get('/user', fn (Request $request) => $request->user());
+Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
+    $user = $request->user()->load('patient'); // eager load the relationship
+
+    return response()->json([
+        'id' => $user->id,
+        'name' => $user->name,
+        'email' => $user->email,
+        'contact_number' => $user->contact_number,
+        'role' => $user->role,
+        'patient' => $user->patient, // include full patient model if exists
+        'is_linked' => optional($user->patient)->is_linked ?? false, // directly available in frontend
+    ]);
+});
+
 
 
 Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
@@ -58,7 +76,7 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
     Route::post('/discounts/{id}/launch', [ServiceDiscountController::class, 'launch']);
     Route::post('/discounts/{id}/cancel', [ServiceDiscountController::class, 'cancel']);
     Route::get('/discounts-overview', [ServiceDiscountController::class, 'allActivePromos']);
-        // Promo Logs / Archive
+    // Promo Logs / Archive
     Route::get('/discounts-archive', [ServiceDiscountController::class, 'archive']);
 
     // Clinic calendar management
@@ -81,10 +99,52 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Clinic calendar resolve route
     Route::get('/clinic-calendar/resolve', [ClinicCalendarController::class, 'resolve']);
+
+    // Appointment
+    Route::prefix('appointment')->group(function () {
+        Route::get('/available-services', [AppointmentServiceController::class, 'availableServices']);
+        Route::post('/', [AppointmentController::class, 'store']);
+        Route::get('/available-slots', [AppointmentSlotController::class, 'get']);
+        Route::post('/{id}/cancel', [AppointmentController::class, 'cancel']);
+        Route::get('/resolve/{code}', [AppointmentController::class, 'resolveReferenceCode']);
+    });
+
+    // Authenticated Patients Linking
+    Route::post('/patients/link-self', [PatientController::class, 'linkSelf']);
+
+    Route::get('/user-appointments', [AppointmentController::class, 'userAppointments']);
+    
 });
 
 Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(function () {
     // Protected routes for approved devices of staff users
+
+    // Patients
+    Route::get('/patients', [PatientController::class, 'index']); // list all patients
+    Route::post('/patients', [PatientController::class, 'store']); // create new walk-in
+    Route::post('/patients/{patient}/link', [PatientController::class, 'linkToUser']); // manual linking
+    Route::post('/patients/{id}/flag', [PatientController::class, 'flagReview']); // flag for manual review
+    Route::get('/patients/search', [PatientController::class, 'search']);
+
+    // Visits
+    Route::prefix('visits')->group(function () {
+        Route::get('/', [PatientVisitController::class, 'index']);               // View all visits
+        Route::post('/', [PatientVisitController::class, 'store']);              // Start a new visit
+        Route::post('/{id}/finish', [PatientVisitController::class, 'finish']);  // Mark visit as complete
+        Route::post('/{id}/reject', [PatientVisitController::class, 'reject']);  // Mark visit as rejected
+        Route::put('/{id}/update-patient', [PatientVisitController::class, 'updatePatient']);
+        Route::post('/{visit}/link-existing', [PatientVisitController::class, 'linkToExistingPatient']);
+
+    });
+
+    // Appointments
+    Route::post('/appointments/{id}/approve', [AppointmentController::class, 'approve']);
+    Route::post('/appointments/{id}/reject', [AppointmentController::class, 'reject']);
+    Route::get('/appointments', [AppointmentController::class, 'index']);
+    Route::get('/appointments/remindable', [AppointmentController::class, 'remindable']);
+    Route::post('/appointments/{id}/send-reminder', [AppointmentController::class, 'sendReminder']);
+
+
 });
 
 // API routes for services

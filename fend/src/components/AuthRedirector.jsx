@@ -1,37 +1,26 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import api from '../api/api';
-import LoadingSpinner from '../components/LoadingSpinner'; // ✅ adjust path if needed
+import { useAuth } from '../hooks/useAuth';
+import LoadingSpinner from './LoadingSpinner';
 
 export default function AuthRedirector() {
-  const [checking, setChecking] = useState(true); // 🔁 controls spinner
+  const { user, authLoading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   useEffect(() => {
-    const checkSession = async () => {
-        try {
-          const res = await api.get('/api/user', { skip401Handler: true });
-          const user = res.data;
-      
-          const publicRoutes = ['/', '/login', '/register', '/forgot-password'];
-          if (publicRoutes.includes(location.pathname)) {
-            if (user.role === 'admin') navigate('/admin');
-            else if (user.role === 'staff') navigate('/staff');
-            else if (user.role === 'patient') navigate('/patient');
-          }
-        } catch (err) {
-          // Not logged in — just finish check
-        } finally {
-          setChecking(false);
-        }
-      };      
+    if (authLoading) return;
 
-    checkSession();
-  }, [location.pathname, navigate]);
+    const publicRoutes = ['/', '/login', '/register', '/forgot-password'];
+    if (user && publicRoutes.includes(location.pathname)) {
+      if (user.role === 'admin') navigate('/admin');
+      else if (user.role === 'staff') navigate('/staff');
+      else if (user.role === 'patient') navigate('/patient');
+    }
+  }, [user, authLoading, location.pathname, navigate]);
 
-  if (checking) {
-    return <LoadingSpinner message="Loading..." />;
+  if (authLoading) {
+    return <LoadingSpinner message="Checking session..." />;
   }
 
   return null;
