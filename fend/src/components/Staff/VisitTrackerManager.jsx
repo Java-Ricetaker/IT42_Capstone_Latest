@@ -59,7 +59,9 @@ function VisitTrackerManager() {
         }
         payload = {
           visit_type: "appointment",
-          appointment_id: appointmentData.id,
+          reference_code: (refCode || "")
+            .toUpperCase()
+            .replace(/[^A-Z0-9]/g, ""),
         };
       }
       await api.post("/api/visits", payload);
@@ -86,10 +88,16 @@ function VisitTrackerManager() {
     setSearching(true);
     setAppointmentData(null);
     setSearchError("");
+
     try {
-      const res = await api.get(`/api/appointments/resolve/${refCode}`);
+      const code = (refCode || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+      if (code.length !== 8) {
+        setSearchError("Enter the full 8-character code.");
+        return;
+      }
+      const res = await api.get(`/api/appointment/resolve/${code}`);
       setAppointmentData(res.data);
-    } catch (err) {
+    } catch {
       setSearchError("Invalid or used reference code.");
     } finally {
       setSearching(false);

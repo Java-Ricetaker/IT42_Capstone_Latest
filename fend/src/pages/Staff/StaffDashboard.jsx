@@ -10,6 +10,7 @@ const StaffDashboard = () => {
     const checkDevice = async () => {
       try {
         const fingerprint = await getFingerprint();
+        api.defaults.headers.common["X-Device-Fingerprint"] = fingerprint;
         const res = await api.get("/api/device-status", {
           headers: {
             "X-Device-Fingerprint": fingerprint,

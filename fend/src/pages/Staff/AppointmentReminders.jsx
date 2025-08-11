@@ -30,7 +30,7 @@ function AppointmentReminders() {
 
   const handleOpenModal = (appointment) => {
     const name = appointment.patient?.user?.name || "Patient";
-    const msg = `Hello ${name}, this is a reminder for your dental appointment on ${appointment.date} at ${appointment.time_slot} for ${appointment.service?.name}. Please arrive on time. – Pitogo's Dental Clinic`;
+    const msg = `Hello ${name}, this is a reminder for your dental appointment on ${appointment.date} at ${appointment.time_slot} for ${appointment.service?.name}. Ref: ${appointment.reference_code}. Please arrive on time. – Pitogo's Dental Clinic`;
 
     setSelected(appointment);
     setMessage(msg);

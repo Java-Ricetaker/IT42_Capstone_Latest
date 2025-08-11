@@ -89,7 +89,7 @@ class AppointmentController extends Controller
 
         // ✅ Generate reference code
         $referenceCode = strtoupper(Str::random(8));
-        
+
         $appointment = Appointment::create([
             'patient_id' => $patient->id,
             'service_id' => $validated['service_id'],
@@ -265,9 +265,12 @@ class AppointmentController extends Controller
     {
         $appointment = Appointment::with('patient.user', 'service')->findOrFail($id);
 
+        $d1 = now()->addDays(1)->toDateString();
+        $d2 = now()->addDays(2)->toDateString();
+
         if (
             $appointment->status !== 'approved' ||
-            $appointment->date !== now()->addDays(2)->toDateString() ||
+            !in_array($appointment->date, [$d1, $d2], true) ||   // ⬅ allow +1 or +2
             $appointment->reminded_at !== null
         ) {
             return response()->json(['message' => 'Not eligible for reminder.'], 422);
@@ -278,10 +281,11 @@ class AppointmentController extends Controller
             return response()->json(['message' => 'Patient has no linked user account.'], 422);
         }
 
-        $message = $request->input('message');
-        $edited = $request->input('edited', false); // default to false
+        // If you haven’t already added the helper:
+        $message = $request->input('message', '');
+        $edited = (bool) $request->input('edited', false);
 
-        // 🔔 Send the message
+        // send via logger (no real SMS)
         NotificationService::send(
             to: $user->contact_number,
             subject: 'Dental Appointment Reminder',
@@ -291,7 +295,6 @@ class AppointmentController extends Controller
         $appointment->reminded_at = now();
         $appointment->save();
 
-        // ✅ Log it (only if edited)
         if ($edited) {
             SystemLog::create([
                 'user_id' => auth()->id(),
@@ -308,11 +311,15 @@ class AppointmentController extends Controller
         return response()->json(['message' => 'Reminder sent.']);
     }
 
+
     public function resolveReferenceCode($code)
     {
+        $normalized = $this->normalizeRef($code);
+
         $appointment = Appointment::with('service', 'patient')
-            ->where('reference_code', $code)
-            ->where('status', 'pending') // only unprocessed appointments
+            ->whereRaw('UPPER(reference_code) = ?', [$normalized])
+            ->where('status', 'approved')
+            // ->whereDate('date', now()->toDateString()) // optional: enable later
             ->first();
 
         if (!$appointment) {
@@ -328,6 +335,52 @@ class AppointmentController extends Controller
         ]);
     }
 
+
+    // Normalize staff-entered code (strip spaces/dashes, uppercase)
+    protected function normalizeRef(string $code): string
+    {
+        return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $code));
+    }
+
+    /**
+     * Staff-only exact resolver.
+     * GET /api/appointments/resolve-exact?code=XXXXYYYY
+     */
+    public function resolveExact(Request $request)
+    {
+        $data = $request->validate([
+            'code' => ['required', 'string', 'size:8'], // adjust size if your codes differ
+        ]);
+
+        $code = $this->normalizeRef($data['code']);
+
+        $appointment = Appointment::with(['service', 'patient.user'])
+            ->whereRaw('UPPER(reference_code) = ?', [$code])
+            ->first();
+
+        if (!$appointment) {
+            return response()->json(['message' => 'No appointment found for that code'], 404);
+        }
+
+        // Optional: only allow certain statuses
+        // if (!in_array($appointment->status, ['pending','approved'])) {
+        //     return response()->json(['message' => 'Appointment not actionable'], 422);
+        // }
+
+        // Audit trail (recommended)
+        SystemLog::create([
+            'user_id' => auth()->id(),
+            'category' => 'appointment',
+            'action' => 'resolve_by_code',
+            'message' => 'Staff ' . auth()->user()->name . ' looked up appointment by reference code',
+            'context' => [
+                'reference_code' => $code,
+                'appointment_id' => $appointment->id,
+            ],
+        ]);
+
+        return response()->json($appointment);
+    }
 
 
 }

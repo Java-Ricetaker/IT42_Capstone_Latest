@@ -143,7 +143,7 @@ Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(functi
     Route::get('/appointments', [AppointmentController::class, 'index']);
     Route::get('/appointments/remindable', [AppointmentController::class, 'remindable']);
     Route::post('/appointments/{id}/send-reminder', [AppointmentController::class, 'sendReminder']);
-
+    Route::get('/appointments/resolve-exact', [AppointmentController::class, 'resolveExact']);
 
 });
 

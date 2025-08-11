@@ -46,26 +46,36 @@ class PatientVisitController extends Controller
 
             return response()->json($visit, 201);
         } elseif ($visitType === 'appointment') {
-            // ❌ Appointment flow not yet implemented
-            // $request->validate([
-            //     'reference_code' => 'required|string|exists:appointments,reference_code',
-            // ]);
+            $data = $request->validate([
+                'reference_code' => ['required', 'string', 'size:8'],
+            ]);
 
-            // $appointment = \App\Models\Appointment::where('reference_code', $request->reference_code)
-            //     ->with('patient', 'service')
-            //     ->firstOrFail();
+            $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $data['reference_code']));
 
-            // $visit = PatientVisit::create([
-            //     'patient_id' => $appointment->patient_id,
-            //     'service_id' => $appointment->service_id,
-            //     'visit_date' => now()->toDateString(),
-            //     'start_time' => now(),
-            //     'status' => 'pending',
-            // ]);
+            $appointment = \App\Models\Appointment::with(['patient', 'service'])
+                ->whereRaw('UPPER(reference_code) = ?', [$code])
+                ->where('status', 'approved')
+                // ->whereDate('date', now()->toDateString()) // re-enable if you want “today only”
+                ->first();
 
-            return response()->json([
-                'message' => 'Appointment visit logic not implemented yet.'
-            ], 501); // HTTP 501 = Not Implemented
+            if (!$appointment) {
+                return response()->json(['message' => 'Invalid or unavailable reference code.'], 422);
+            }
+
+            // Create the visit
+            $visit = PatientVisit::create([
+                'patient_id' => $appointment->patient_id,
+                'service_id' => $appointment->service_id,
+                'visit_date' => now()->toDateString(),
+                'start_time' => now(),
+                'status' => 'pending',
+            ]);
+
+            // Prevent code reuse (recommended)
+            $appointment->reference_code = null;
+            $appointment->save();
+
+            return response()->json($visit, 201);
         }
 
         return response()->json(['message' => 'Invalid visit type.'], 422);
