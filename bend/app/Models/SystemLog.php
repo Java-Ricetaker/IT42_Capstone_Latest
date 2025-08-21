@@ -13,6 +13,7 @@ class SystemLog extends Model
         'user_id',
         'category',
         'action',
+        'subject_id',   // ← add this
         'message',
         'context',
     ];
@@ -24,5 +25,27 @@ class SystemLog extends Model
     public function user()
     {
         return $this->belongsTo(User::class);
+    }
+
+    /* -------- Optional convenience scopes -------- */
+
+    // Filter by actor (who did it)
+    public function scopeByUser($q, $userId)
+    {
+        return $q->where('user_id', $userId);
+    }
+
+    // Filter by subject (what it was about)
+    public function scopeForSubject($q, string $category, int $subjectId)
+    {
+        return $q->where('category', $category)
+                 ->where('subject_id', $subjectId);
+    }
+
+    // Common dashboard slice
+    public function scopeByAction($q, string $category, string $action)
+    {
+        return $q->where('category', $category)
+                 ->where('action', $action);
     }
 }

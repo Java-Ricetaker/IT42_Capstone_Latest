@@ -25,6 +25,7 @@ class DatabaseSeeder extends Seeder
             ServiceDiscountSeeder::class,
             ClinicWeeklyScheduleSeeder::class,
             PatientSeeder::class,
+            DentistScheduleSeeder::class,
             // Add other seeders here as needed
         ]);
     }

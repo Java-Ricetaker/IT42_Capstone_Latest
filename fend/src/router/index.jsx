@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import AuthRedirector from "../components/AuthRedirector";
+import { lazy, Suspense } from "react";
 
 import LandingPage from "../pages/LandingPage";
 
@@ -23,6 +24,9 @@ import ServiceDiscountManager from "../pages/Admin/ServiceDiscountManager";
 import PromoArchive from "../pages/Admin/PromoArchive";
 import ScheduleManager from "../pages/Admin/ScheduleManager";
 import ClinicCalendarManager from "../pages/Admin/ClinicCalendarManager";
+const DentistScheduleManager = lazy(() =>
+  import("../pages/Admin/DentistScheduleManager")
+); // Lazy load dentist schedule manager
 
 // Staff layout and pages
 import StaffLayout from "../layouts/StaffLayout";
@@ -33,9 +37,9 @@ import AppointmentReminders from "../pages/Staff/AppointmentReminders";
 
 // Patient layout and pages
 import PatientLayout from "../layouts/PatientLayout";
-import BookAppointment from "../pages/Patient/BookAppointment"; 
-import PatientProfile from "../pages/Patient/PatientProfile"; 
-import PatientAppointments from "../pages/Patient/PatientAppointments"; 
+import BookAppointment from "../pages/Patient/BookAppointment";
+import PatientProfile from "../pages/Patient/PatientProfile";
+import PatientAppointments from "../pages/Patient/PatientAppointments";
 
 export default function AppRouter() {
   return (
@@ -67,6 +71,14 @@ export default function AppRouter() {
           <Route path="schedule" element={<ScheduleManager />} />
 
           <Route path="clinic-calendar" element={<ClinicCalendarManager />} />
+          <Route
+            path="dentists"
+            element={
+              <Suspense fallback={<div>Loading…</div>}>
+                <DentistScheduleManager />
+              </Suspense>
+            }
+          />
           {/* Add more admin routes as needed */}
         </Route>
 
@@ -75,7 +87,10 @@ export default function AppRouter() {
           <Route index element={<StaffDashboard />} />
           <Route path="profile" element={<StaffProfile />} />
           <Route path="appointments" element={<StaffAppointmentManager />} />
-          <Route path="appointment-reminders" element={<AppointmentReminders />} />
+          <Route
+            path="appointment-reminders"
+            element={<AppointmentReminders />}
+          />
           {/* Add more staff routes as needed */}
         </Route>
 
@@ -84,7 +99,6 @@ export default function AppRouter() {
           <Route path="appointment" element={<BookAppointment />} />
           <Route path="profile" element={<PatientProfile />} />
           <Route path="appointments" element={<PatientAppointments />} />
-
         </Route>
         {/* Catch-all for 404 */}
         <Route path="*" element={<div>404 Not Found</div>} />

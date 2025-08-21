@@ -21,7 +21,13 @@ return new class extends Migration {
             $table->date('special_start_date')->nullable();
             $table->date('special_end_date')->nullable();
             $table->integer('estimated_minutes');
+
+            // 🔹 new column
+            $table->boolean('is_active')->default(true);
+
             $table->timestamps();
+
+            $table->index('is_active'); // 🔹 index is valid now
         });
     }
 

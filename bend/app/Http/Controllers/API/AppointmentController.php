@@ -12,88 +12,107 @@ use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use App\Helpers\NotificationService;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\API\ClinicCalendarController;
+use App\Services\ClinicDateResolverService;
 
 class AppointmentController extends Controller
 {
-    public function store(Request $request)
+    public function store(Request $request, ClinicDateResolverService $resolver)
     {
         $validated = $request->validate([
             'service_id' => 'required|exists:services,id',
-            'date' => 'required|date|after:today',
-            'start_time' => 'required|string', // e.g., "08:00"
+            'date' => 'required|date_format:Y-m-d|after:today',
+            // accept HH:MM or HH:MM:SS
+            'start_time' => ['required', 'regex:/^\d{2}:\d{2}(:\d{2})?$/'],
             'payment_method' => ['required', Rule::in(['cash', 'maya', 'hmo'])],
         ]);
 
         $service = Service::findOrFail($validated['service_id']);
-        $blocksNeeded = ceil($service->estimated_minutes / 30);
-        $date = $validated['date'];
-        $startTime = Carbon::parse($validated['start_time']);
+        $blocksNeeded = (int) max(1, ceil($service->estimated_minutes / 30));
+        $dateStr = $validated['date'];
+        $date = Carbon::createFromFormat('Y-m-d', $dateStr)->startOfDay();
 
-        // Resolve clinic calendar for the date
-        $resolved = ClinicCalendarController::smartResolveDate($date);
+        $startRaw = $validated['start_time'];
+        $startTime = Carbon::createFromFormat('H:i', $this->normalizeTime($startRaw));
 
-        if (!$resolved['is_open']) {
+        // booking window check (tomorrow .. +7)
+        $today = now()->startOfDay();
+        if ($date->lte($today) || $date->gt($today->copy()->addDays(7))) {
+            return response()->json(['message' => 'Date is outside the booking window.'], 422);
+        }
+
+        // resolve day snapshot
+        $snap = $resolver->resolve($date);
+        if (!$snap['is_open']) {
             return response()->json(['message' => 'Clinic is closed on this date.'], 422);
         }
 
-        $open = Carbon::parse($resolved['opening_time']);
-        $close = Carbon::parse($resolved['closing_time']);
-        $maxPerSlot = (int) $resolved['dentist_count'];
+        $open = Carbon::parse($snap['open_time']);
+        $close = Carbon::parse($snap['close_time']);
+        $cap = (int) $snap['effective_capacity'];
 
-        // Check if the full time range is within clinic hours
+        // ensure start is in the 30‑min grid and inside hours
+        $grid = ClinicDateResolverService::buildBlocks($snap['open_time'], $snap['close_time']);
+        if (!in_array($startTime->format('H:i'), $grid, true)) {
+            return response()->json(['message' => 'Invalid start time (not on grid or outside hours).'], 422);
+        }
+
         $endTime = $startTime->copy()->addMinutes($service->estimated_minutes);
-
         if ($startTime->lt($open) || $endTime->gt($close)) {
             return response()->json(['message' => 'Selected time is outside clinic hours.'], 422);
         }
 
-        // Check if required time blocks are already full
-        $appointments = Appointment::where('date', $date)->get();
-        $slotUsage = [];
+        // build usage map (pending+approved)
+        $slotUsage = array_fill_keys($grid, 0);
+        $appointments = Appointment::whereDate('date', $dateStr)
+            ->whereIn('status', ['pending', 'approved'])
+            ->get(['time_slot']);
 
         foreach ($appointments as $appt) {
-            [$aStart, $aEnd] = explode('-', $appt->time_slot);
-            $aStartTime = Carbon::parse($aStart);
-            $aEndTime = Carbon::parse($aEnd);
+            if (!$appt->time_slot || strpos($appt->time_slot, '-') === false)
+                continue;
 
-            while ($aStartTime->lt($aEndTime)) {
-                $key = $aStartTime->format('H:i');
-                $slotUsage[$key] = ($slotUsage[$key] ?? 0) + 1;
-                $aStartTime->addMinutes(30);
+            [$aStart, $aEnd] = explode('-', $appt->time_slot, 2);
+            $aStart = $this->normalizeTime(trim($aStart));
+            $aEnd = $this->normalizeTime(trim($aEnd));
+
+            $cur = Carbon::createFromFormat('H:i', $aStart);
+            $end = Carbon::createFromFormat('H:i', $aEnd);
+
+            while ($cur->lt($end)) {
+                $k = $cur->format('H:i');
+                if (isset($slotUsage[$k]))
+                    $slotUsage[$k] += 1;
+                $cur->addMinutes(30);
             }
         }
 
-        // Build window from requested start time
-        $blocks = [];
-        $cursor = $startTime->copy();
 
+        // per-block capacity check
+        $cursor = $startTime->copy();
         for ($i = 0; $i < $blocksNeeded; $i++) {
-            $key = $cursor->format('H:i');
-            if (($slotUsage[$key] ?? 0) >= $maxPerSlot) {
-                return response()->json(['message' => "Time slot starting at $key is already full."], 422);
+            $k = $cursor->format('H:i');
+            if (!array_key_exists($k, $slotUsage) || $slotUsage[$k] >= $cap) {
+                return response()->json(['message' => "Time slot starting at {$k} is already full."], 422);
             }
             $cursor->addMinutes(30);
         }
 
-        // All checks passed — create appointment
-        $timeSlot = $startTime->format('H:i') . '-' . $endTime->format('H:i');
+        // create appointment
+        $timeSlot = $this->normalizeTime($startTime) . '-' . $this->normalizeTime($endTime);
 
         $patient = Patient::byUser(auth()->id());
-
         if (!$patient) {
             return response()->json([
                 'message' => 'Your account is not yet linked to a patient record. Please contact the clinic.',
             ], 422);
         }
 
-        // ✅ Generate reference code
         $referenceCode = strtoupper(Str::random(8));
 
         $appointment = Appointment::create([
             'patient_id' => $patient->id,
-            'service_id' => $validated['service_id'],
-            'date' => $date,
+            'service_id' => $service->id,
+            'date' => $dateStr,
             'time_slot' => $timeSlot,
             'reference_code' => $referenceCode,
             'status' => 'pending',
@@ -105,8 +124,9 @@ class AppointmentController extends Controller
             'message' => 'Appointment booked.',
             'reference_code' => $appointment->reference_code,
             'appointment' => $appointment
-        ]);
+        ], 201);
     }
+
 
 
     // Optional: Add list(), cancel(), approve(), reject() here later
@@ -382,5 +402,13 @@ class AppointmentController extends Controller
         return response()->json($appointment);
     }
 
+    private function normalizeTime(Carbon|string $time): string
+    {
+        if ($time instanceof Carbon) {
+            return $time->format('H:i');
+        }
+        // handles "HH:MM" or "HH:MM:SS"
+        return Carbon::createFromFormat(strlen($time) === 8 ? 'H:i:s' : 'H:i', $time)->format('H:i');
+    }
 
 }

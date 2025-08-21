@@ -16,14 +16,11 @@ return new class extends Migration {
             $table->boolean('is_open')->default(false);
             $table->time('open_time')->nullable();
             $table->time('close_time')->nullable();
-            $table->unsignedTinyInteger('dentist_count')->default(1);
-            $table->unsignedTinyInteger('max_per_slot')->default(1); // max patients per slot, must not exceed dentist count
-            $table->string('note')->nullable(); // optional comment (e.g. shortened hours)
+            $table->string('note')->nullable();
             $table->timestamps();
 
-            $table->unique('weekday'); // enforce one entry per weekday
+            $table->unique('weekday'); // one row per weekday
         });
-
     }
 
     /**

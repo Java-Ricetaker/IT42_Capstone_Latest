@@ -77,6 +77,16 @@ function AdminLayout() {
           </li>
           <li className="nav-item">
             <NavLink
+              to="/admin/dentists"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
+              🧑‍⚕️ Dentists
+            </NavLink>
+          </li>
+          <li className="nav-item">
+            <NavLink
               to="/admin/services"
               className={({ isActive }) =>
                 "nav-link text-white" + (isActive ? " fw-bold" : "")

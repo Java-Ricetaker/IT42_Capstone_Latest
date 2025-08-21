@@ -13,12 +13,14 @@ class ClinicCalendar extends Model
         'is_open',
         'open_time',
         'close_time',
-        'dentist_count',
+        'max_per_block_override',   // NEW: capacity cap
+        'is_generated',             // NEW: hide capacity rows from overrides UI
         'note',
     ];
 
     protected $casts = [
         'date' => 'date',
         'is_open' => 'boolean',
+        'is_generated' => 'boolean',
     ];
 }

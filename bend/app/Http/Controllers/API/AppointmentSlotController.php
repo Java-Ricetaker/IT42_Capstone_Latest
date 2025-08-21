@@ -7,7 +7,7 @@ use App\Models\Service;
 use App\Models\Appointment;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
-use App\Http\Controllers\API\ClinicCalendarController;
+use App\Services\ClinicDateResolverService;
 
 class AppointmentSlotController extends Controller
 {
@@ -16,103 +16,98 @@ class AppointmentSlotController extends Controller
      * It considers the service duration, the clinic's open hours for that day,
      * and the current usage of each 30-minute slot based on existing appointments.
      */
-    public function get(Request $request)
+    public function get(Request $request, ClinicDateResolverService $resolver)
     {
-        // Validate input
-        $date = $request->query('date');
-        $serviceId = $request->query('service_id');
+        $data = $request->validate([
+            'date' => 'required|date_format:Y-m-d',
+            'service_id' => 'nullable|integer|exists:services,id',
+        ]);
 
-        if (!$date || !$serviceId) {
-            return response()->json(['message' => 'Missing date or service_id.'], 422);
-        }
-
-        // Load the service and determine how many 30-minute blocks it needs
-        $service = Service::findOrFail($serviceId);
-        $blocksNeeded = ceil($service->estimated_minutes / 30);
-
-        // Get resolved clinic hours and dentist count for this date
-        $resolved = ClinicCalendarController::smartResolveDate($date);
-
-        if (!$resolved['is_open']) {
+        $date = Carbon::createFromFormat('Y-m-d', $data['date'])->startOfDay();
+        $snap = $resolver->resolve($date);
+        if (!$snap['is_open']) {
+            // keep the shape the frontend expects
             return response()->json(['slots' => []]);
         }
 
-        $open = Carbon::parse($resolved['opening_time']);
-        $close = Carbon::parse($resolved['closing_time']);
-        $maxPerSlot = (int) $resolved['dentist_count'];
+        // Build 30-min grid from open/close (strings like "08:00" .. "17:00")
+        $blocks = ClinicDateResolverService::buildBlocks($snap['open_time'], $snap['close_time']);
+        $usage  = array_fill_keys($blocks, 0);
 
+        // Count PENDING + APPROVED on that date (parse "HH:MM[-SS]-HH:MM[-SS]")
+        $appts = Appointment::whereDate('date', $date->toDateString())
+            ->whereIn('status', ['pending', 'approved'])
+            ->get(['time_slot']);
 
-        // Generate all 30-minute blocks between open and close
-        $blocks = [];
-        $current = clone $open;
+        foreach ($appts as $a) {
+            if (!$a->time_slot || strpos($a->time_slot, '-') === false) {
+                continue;
+            }
+            [$aStart, $aEnd] = explode('-', $a->time_slot, 2);
+            $cur = $this->parseFlexibleTime(trim($aStart));
+            $end = $this->parseFlexibleTime(trim($aEnd));
 
-        while ($current->copy()->addMinutes(30)->lte($close)) {
-            $blocks[] = $current->format('H:i');
-            $current->addMinutes(30);
-        }
-
-
-        // \Log::debug('Resolved clinic schedule', [
-        //     'input_date' => $date,
-        //     'resolved' => $resolved
-        // ]);
-
-        // ✅ Early return if service duration doesn't fit in the day
-        if ($blocksNeeded > count($blocks)) {
-            return response()->json(['slots' => []]);
-        }
-
-        // Count how many appointments are using each 30-min slot
-        $appointments = Appointment::where('date', $date)->get();
-        $slotUsage = []; // e.g. ['08:00' => 1, '08:30' => 2]
-
-        foreach ($appointments as $appt) {
-            [$start, $end] = explode('-', $appt->time_slot);
-            $startTime = Carbon::parse($start);
-            $endTime = Carbon::parse($end);
-
-            while ($startTime->lt($endTime)) {
-                $key = $startTime->format('H:i');
-                $slotUsage[$key] = ($slotUsage[$key] ?? 0) + 1;
-                $startTime->addMinutes(30);
+            while ($cur->lt($end)) {
+                $k = $cur->format('H:i');
+                if (isset($usage[$k])) {
+                    $usage[$k] += 1;
+                }
+                $cur->addMinutes(30);
             }
         }
 
-        // Optional: Optimization block using static cache (disabled for now)
-        /*
-        static $cachedSlotUsage = [];
-        $slotUsageKey = $date;
+        $cap = (int) $snap['effective_capacity'];
 
-        if (!isset($cachedSlotUsage[$slotUsageKey])) {
-            $cachedSlotUsage[$slotUsageKey] = $slotUsage;
+        // Determine how many blocks the requested service needs (default 1 if none)
+        $requiredBlocks = 1;
+        if (!empty($data['service_id'])) {
+            $service = Service::findOrFail($data['service_id']);
+            $requiredBlocks = max(1, (int) ceil(($service->estimated_minutes ?? 0) / 30));
         }
 
-        $slotUsage = $cachedSlotUsage[$slotUsageKey];
-        */
+        // Return every start time whose covered blocks stay strictly below cap
+        $valid = [];
+        foreach ($blocks as $start) {
+            $t  = Carbon::createFromFormat('H:i', $start);
+            $ok = true;
 
-        // Check each possible start slot to see if enough consecutive blocks are free
-        $validStarts = [];
-
-        for ($i = 0; $i <= count($blocks) - $blocksNeeded; $i++) {
-            $window = array_slice($blocks, $i, $blocksNeeded);
-            $valid = true;
-
-            foreach ($window as $slot) {
-                if (($slotUsage[$slot] ?? 0) >= $maxPerSlot) {
-                    $valid = false;
+            for ($i = 0; $i < $requiredBlocks; $i++) {
+                $k = $t->format('H:i');
+                if (!array_key_exists($k, $usage) || $usage[$k] >= $cap) {
+                    $ok = false;
                     break;
                 }
+                $t->addMinutes(30);
             }
 
-            if ($valid) {
-                $validStarts[] = $blocks[$i]; // Add valid starting slot
+            if ($ok) {
+                $valid[] = $start; // "HH:MM"
             }
         }
 
-        // Return the list of valid starting slots and the service's estimated duration
-        return response()->json([
-            'slots' => $validStarts,
-            'duration_minutes' => $service->estimated_minutes,
-        ]);
+        return response()->json(['slots' => $valid]);
+    }
+
+    private function fitsCapacity(string $start, int $requiredBlocks, array $usage, int $cap): bool
+    {
+        $t = Carbon::createFromFormat('H:i', $start);
+        for ($i = 0; $i < $requiredBlocks; $i++) {
+            $k = $t->format('H:i');
+            if (!array_key_exists($k, $usage) || $usage[$k] >= $cap) {
+                return false;
+            }
+            $t->addMinutes(30);
+        }
+        return true;
+    }
+
+    /**
+     * Accepts "HH:MM" or "HH:MM:SS" and returns a Carbon instance.
+     */
+    private function parseFlexibleTime(string $time): Carbon
+    {
+        return (strlen($time) === 8)
+            ? Carbon::createFromFormat('H:i:s', $time)
+            : Carbon::createFromFormat('H:i', $time);
     }
 }
