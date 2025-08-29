@@ -10,9 +10,10 @@ use App\Http\Middleware\EnsureDeviceIsApproved;
 use App\Http\Controllers\DeviceStatusController;
 use App\Http\Controllers\API\AppointmentController;
 
+use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
-use App\Http\Controllers\Admin\StaffAccountController;
 
+use App\Http\Controllers\Admin\StaffAccountController;
 use App\Http\Controllers\API\ClinicCalendarController;
 use App\Http\Controllers\Staff\PatientVisitController;
 use App\Http\Controllers\API\AppointmentSlotController;
@@ -20,8 +21,8 @@ use App\Http\Controllers\API\DentistScheduleController;
 use App\Http\Controllers\API\ServiceDiscountController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Admin\DeviceApprovalController;
-use App\Http\Controllers\API\AppointmentServiceController;
 
+use App\Http\Controllers\API\AppointmentServiceController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\API\ClinicWeeklyScheduleController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
@@ -97,6 +98,8 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
         Route::get('/daily', [ClinicCalendarController::class, 'daily']);
         Route::put('/day/{date}', [ClinicCalendarController::class, 'upsertDay'])
             ->where('date', '\d{4}-\d{2}-\d{2}');
+
+        Route::put('/{date}/closure', [ClinicCalendarController::class, 'setClosure']);
     });
 
 
@@ -122,7 +125,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Clinic calendar resolve
     Route::get('/clinic-calendar/resolve', [ClinicCalendarController::class, 'resolve']);
-
+    Route::get('/clinic-calendar/alerts', [ClinicCalendarController::class, 'upcomingClosures']);
+    Route::get('/me/closure-impacts', [ClinicCalendarController::class, 'myClosureImpacts']);
+    
     // Appointment (patient side)
     Route::prefix('appointment')->group(function () {
         Route::get('/available-services', [AppointmentServiceController::class, 'availableServices']);
@@ -137,6 +142,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Patient's own appointments
     Route::get('/user-appointments', [AppointmentController::class, 'userAppointments']);
+
+    // Notifications
+    Route::get('/notifications', [NotificationController::class, 'index']);
+    Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
+    Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
+    Route::get('/notifications/mine', [NotificationController::class, 'mine'])->middleware('throttle:30,1');
 });
 
 // ------------------------

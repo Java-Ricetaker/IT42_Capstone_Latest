@@ -11,7 +11,8 @@ const toYMD = (v) => {
 };
 
 export default function CapacityPlanner() {
-  const [rows, setRows] = useState([]); // [{date, active_dentists, max_parallel, is_closed, note}]
+  const [rows, setRows] = useState([]); // working copy
+  const [origRows, setOrigRows] = useState([]); // snapshot for change detection
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -28,20 +29,20 @@ export default function CapacityPlanner() {
           params: { from, days },
         });
         const list = Array.isArray(res.data) ? res.data : [];
-        setRows(
-          list.map((r) => ({
-            date: toYMD(r.date),
-            active_dentists: Number.isFinite(+r.active_dentists)
-              ? +r.active_dentists
-              : 0,
-            max_parallel:
-              r.max_parallel === null || r.max_parallel === undefined
-                ? ""
-                : String(r.max_parallel),
-            is_closed: !!r.is_closed,
-            note: r.note ?? "",
-          }))
-        );
+        const normalized = list.map((r) => ({
+          date: toYMD(r.date),
+          active_dentists: Number.isFinite(+r.active_dentists)
+            ? +r.active_dentists
+            : 0,
+          max_parallel:
+            r.max_parallel === null || r.max_parallel === undefined
+              ? ""
+              : String(r.max_parallel),
+          is_closed: !!r.is_closed,
+          note: r.note ?? "",
+        }));
+        setRows(normalized);
+        setOrigRows(normalized); // take snapshot
       } catch (e) {
         console.error(e);
         setError(e?.response?.data?.message || "Failed to load capacity.");
@@ -55,26 +56,54 @@ export default function CapacityPlanner() {
   const updateRow = (i, patch) =>
     setRows((old) => old.map((r, idx) => (idx === i ? { ...r, ...patch } : r)));
 
-  const saveOne = async (row) => {
-    // Do NOT touch closed/holiday days here — keep them owned by overrides/weekly
-    if (row.is_closed) return;
+  // Detect field changes vs orig snapshot
+  const changed = (row, orig) => {
+    if (!orig) return true;
+    return (
+      row.is_closed !== orig.is_closed ||
+      (row.max_parallel ?? "") !== (orig.max_parallel ?? "") ||
+      (row.note ?? "") !== (orig.note ?? "")
+    );
+  };
 
-    // Only send fields Capacity controls (no is_closed here)
-    await api.put(`/api/clinic-calendar/day/${row.date}`, {
-      max_parallel:
-        row.max_parallel === "" || row.max_parallel === null
-          ? null
-          : Number(row.max_parallel),
-      note: row.note?.trim() || null,
-    });
+  // Save one row (handles closure toggle + capacity)
+  const saveOne = async (row, orig) => {
+    // If nothing changed, skip
+    if (!changed(row, orig)) return;
+
+    const statusChanged = row.is_closed !== orig.is_closed;
+
+    // 1) If status changed, toggle closure first
+    if (statusChanged) {
+      await api.put(`/api/clinic-calendar/${row.date}/closure`, {
+        closed: row.is_closed, // true = close, false = reopen
+        message: row.note?.trim() || null, // reuse note as closure reason
+      });
+    }
+
+    // 2) If day is open (either stayed open or was reopened), save capacity/note
+    //    If day is closed, skip capacity (closure/manual row owns it).
+    if (!row.is_closed) {
+      await api.put(`/api/clinic-calendar/day/${row.date}`, {
+        max_parallel:
+          row.max_parallel === "" || row.max_parallel === null
+            ? null
+            : Number(row.max_parallel),
+        note: row.note?.trim() || null,
+      });
+    }
   };
 
   const saveAll = async () => {
     setSaving(true);
     setError("");
     try {
-      await Promise.all(rows.map(saveOne));
-      alert("Capacity saved.");
+      // Map rows to their original counterparts by date
+      const origByDate = Object.fromEntries(origRows.map((o) => [o.date, o]));
+      await Promise.all(rows.map((r) => saveOne(r, origByDate[r.date])));
+      alert("Changes saved.");
+      // Refresh snapshot so subsequent saves only send new changes
+      setOrigRows(rows);
     } catch (e) {
       console.error(e);
       setError(e?.response?.data?.message || "Save failed.");
@@ -113,8 +142,10 @@ export default function CapacityPlanner() {
                 <th>Weekday</th>
                 <th className="text-center">Active Dentists</th>
                 <th style={{ minWidth: 180 }}>Max same‑time appts</th>
-                <th className="text-center">Status</th>
-                <th>Note</th>
+                <th className="text-center" style={{ minWidth: 120 }}>
+                  Status
+                </th>
+                <th>Note / Reason</th>
                 <th className="text-center">Effective capacity</th>
               </tr>
             </thead>
@@ -155,31 +186,52 @@ export default function CapacityPlanner() {
                         {dentists}).
                       </div>
                       {r.max_parallel !== "" &&
-                        Number(r.max_parallel) > dentists && !r.is_closed && (
+                        Number(r.max_parallel) > dentists &&
+                        !r.is_closed && (
                           <small className="text-danger">
                             Cap exceeds available dentists — effective capacity
                             won’t exceed {dentists}.
                           </small>
                         )}
                     </td>
+
+                    {/* Status dropdown */}
                     <td className="text-center">
-                      {r.is_closed ? (
-                        <span className="badge bg-danger">Closed</span>
-                      ) : (
-                        <span className="badge bg-success">Open</span>
-                      )}
+                      <select
+                        className="form-select form-select-sm"
+                        value={r.is_closed ? "closed" : "open"}
+                        onChange={(e) =>
+                          updateRow(i, {
+                            is_closed: e.target.value === "closed",
+                          })
+                        }
+                        aria-label={`Status for ${r.date}`}
+                      >
+                        <option value="open">Open</option>
+                        <option value="closed">Closed</option>
+                      </select>
                     </td>
+
+                    {/* Note stays editable even when closed (closure reason) */}
                     <td>
                       <input
                         className="form-control form-control-sm"
                         value={r.note}
                         onChange={(e) => updateRow(i, { note: e.target.value })}
-                        placeholder="Optional note"
-                        disabled={r.is_closed}
+                        placeholder={
+                          r.is_closed
+                            ? "Reason for closure (shown to users)"
+                            : "Optional note"
+                        }
                       />
                     </td>
+
                     <td className="text-center">
-                      {cap === Infinity ? (r.is_closed ? 0 : dentists) : effective}
+                      {cap === Infinity
+                        ? r.is_closed
+                          ? 0
+                          : dentists
+                        : effective}
                     </td>
                   </tr>
                 );

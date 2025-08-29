@@ -249,5 +249,169 @@ class ClinicCalendarController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function setClosure(Request $req, $date)
+    {
+        $data = $req->validate([
+            'closed' => ['required', 'boolean'],
+            'message' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $d = Carbon::parse($date)->toDateString();
+        $row = DB::table('clinic_calendar')->where('date', $d)->first();
+
+        $payload = [
+            'is_open' => !$data['closed'],
+            'note' => $data['message'] ?? null,
+            'dentist_count' => $data['closed'] ? 0 : ($row->dentist_count ?? 1),
+            'is_generated' => false,
+            'updated_at' => now(),
+        ];
+
+        // run everything atomically
+        return DB::transaction(function () use ($req, $d, $payload, $data) {
+            $row = DB::table('clinic_calendar')->where('date', $d)->first();
+
+            if ($row) {
+                DB::table('clinic_calendar')->where('id', $row->id)->update($payload);
+            } else {
+                DB::table('clinic_calendar')->insert(array_merge($payload, [
+                    'date' => $d,
+                    'open_time' => null,
+                    'close_time' => null,
+                    'max_per_block_override' => null,
+                    'created_at' => now(),
+                ]));
+            }
+
+            $affectedCount = 0;
+
+            // --- NEW: auto-reject affected appointments on closed day ---
+            if ($data['closed']) {
+                $reason = "Auto-rejected due to clinic closure {$d}" . ($data['message'] ? " — {$data['message']}" : "");
+
+                // Bulk update: set status to 'rejected' and append reason to notes
+                // (updates only pending/approved on the closed date)
+                $affectedCount = DB::update(
+                    "UPDATE appointments
+                 SET status='rejected',
+                     notes = CASE
+                               WHEN notes IS NULL OR notes = '' THEN ?
+                               ELSE CONCAT(notes, ' | ', ?)
+                             END,
+                     updated_at=?
+                 WHERE date = ? AND status IN ('pending','approved')",
+                    [$reason, $reason, now(), $d]
+                );
+
+                // --- Notifications block (kept as you had) ---
+
+                // 1) Broadcast closure (visible to everyone until that day passes)
+                $broadcastId = DB::table('notifications')->insertGetId([
+                    'type' => 'closure',
+                    'title' => "Clinic closed on {$d}",
+                    'body' => $data['message'] ?? null,
+                    'severity' => 'warning',
+                    'scope' => 'broadcast',
+                    'audience_roles' => json_encode(['patient', 'staff', 'admin']),
+                    'effective_from' => now(),
+                    'effective_until' => Carbon::parse($d)->endOfDay(),
+                    'data' => json_encode(['date' => $d]),
+                    'created_by' => $req->user()->id ?? null,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+
+                // 2) Targeted for patients who already booked that day
+                $patientUserIds = DB::table('appointments as a')
+                    ->join('patients as p', 'p.id', '=', 'a.patient_id')
+                    ->whereDate('a.date', $d)
+                    ->whereIn('a.status', ['pending', 'approved', 'rejected']) // include just-rejected to ensure they still get the alert
+                    ->whereNotNull('p.user_id')
+                    ->pluck('p.user_id')->unique()->values();
+
+                if ($patientUserIds->isNotEmpty()) {
+                    $targetNoticeId = DB::table('notifications')->insertGetId([
+                        'type' => 'closure',
+                        'title' => "Your appointment is affected ({$d})",
+                        'body' => $data['message'] ?? null,
+                        'severity' => 'danger',
+                        'scope' => 'targeted',
+                        'data' => json_encode(['date' => $d]),
+                        'created_by' => $req->user()->id ?? null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+
+                    $bulk = $patientUserIds->map(fn($uid) => [
+                        'notification_id' => $targetNoticeId,
+                        'user_id' => $uid,
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ])->all();
+
+                    DB::table('notification_targets')->insert($bulk);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Clinic closure updated.',
+                'auto_rejected' => $affectedCount, // how many appts were auto-rejected
+            ]);
+        });
+    }
+
+
+
+    // GET /api/clinic-calendar/alerts?withinDays=7
+    public function upcomingClosures(Request $req)
+    {
+        $within = max(1, (int) $req->query('withinDays', 7));
+        $today = Carbon::today();
+        $until = $today->copy()->addDays($within);
+
+        $closures = DB::table('clinic_calendar')
+            ->whereBetween('date', [$today->toDateString(), $until->toDateString()])
+            ->where('is_open', false)
+            ->orderBy('date')
+            ->get(['date', DB::raw('note as closure_message')]);
+
+        return response()->json([
+            'today' => $today->toDateString(),
+            'until' => $until->toDateString(),
+            'closures' => $closures,
+        ]);
+    }
+
+    public function myClosureImpacts(Request $req)
+    {
+        $user = $req->user();
+        $days = max(1, (int) $req->query('days', 30));
+        $today = Carbon::today();
+        $until = $today->copy()->addDays($days);
+
+        $rows = \DB::table('appointments as a')
+            ->join('patients as p', 'p.id', '=', 'a.patient_id')             // join via patient
+            ->join('clinic_calendar as c', 'c.date', '=', 'a.date')
+            ->where('p.user_id', $user->id)                                  // filter by signed-in user
+            ->whereIn('a.status', ['pending', 'approved'])
+            ->whereBetween('a.date', [$today->toDateString(), $until->toDateString()])
+            ->where('c.is_open', false)                                      // closed days only
+            ->orderBy('a.date')
+            ->get([
+                'a.id as appointment_id',
+                'a.date',
+                'a.time_slot',
+                'a.service_id',
+                'a.status',
+                \DB::raw('c.note as closure_message'),
+            ]);
+
+        return response()->json([
+            'today' => $today->toDateString(),
+            'until' => $until->toDateString(),
+            'impacts' => $rows,
+        ]);
+    }
+
 
 }

@@ -41,6 +41,9 @@ import BookAppointment from "../pages/Patient/BookAppointment";
 import PatientProfile from "../pages/Patient/PatientProfile";
 import PatientAppointments from "../pages/Patient/PatientAppointments";
 
+// 
+import NotificationsPage from "../pages/NotificationsPage";
+
 export default function AppRouter() {
   return (
     <BrowserRouter>
@@ -54,6 +57,7 @@ export default function AppRouter() {
         <Route path="/password-reset/:token" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/verify-success" element={<VerifySuccess />} />
+        <Route path="/notifications" element={<NotificationsPage />} />
 
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminLayout />}>

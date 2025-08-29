@@ -1,6 +1,7 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import api from "../api/api";
+import NotificationBell from "./NotificationBell"; // ✅ new bell
 
 function PatientNavbar() {
   const navigate = useNavigate();
@@ -38,6 +39,9 @@ function PatientNavbar() {
         <Link to="/patient/profile" className="nav-link">
           👤 Profile
         </Link>
+
+        {/* 🔔 Unified notifications (closures, targeted alerts, etc.) */}
+        {user && <NotificationBell />}
 
         {user && (
           <button

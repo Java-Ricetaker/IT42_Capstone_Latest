@@ -4,7 +4,9 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use App\Models\Patient;
+use App\Models\Notification;
 use Laravel\Sanctum\HasApiTokens;
+use App\Models\NotificationTarget;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -55,5 +57,23 @@ class User extends Authenticatable implements MustVerifyEmail
     {
         return $this->hasOne(Patient::class);
     }
+
+    public function notificationTargets()
+    {
+        return $this->hasMany(NotificationTarget::class);
+    }
+
+    // User.php
+    public function notifications()
+    {
+        return $this->belongsToMany(
+            Notification::class,
+            'notification_targets',   // pivot table
+            'user_id',                // FK to users
+            'notification_id'         // FK to notifications
+        )->withPivot(['seen_at', 'read_at']) // ⬅️ expose pivot fields
+            ->withTimestamps();                // fills pivot created_at/updated_at
+    }
+
 
 }
