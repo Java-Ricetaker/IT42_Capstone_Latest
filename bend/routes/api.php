@@ -8,20 +8,23 @@ use App\Http\Controllers\API\PatientController;
 use App\Http\Controllers\API\ServiceController;
 use App\Http\Middleware\EnsureDeviceIsApproved;
 use App\Http\Controllers\DeviceStatusController;
+use App\Http\Controllers\API\InventoryController;
+
 use App\Http\Controllers\API\AppointmentController;
-
 use App\Http\Controllers\API\NotificationController;
-use App\Http\Controllers\Auth\NewPasswordController;
 
+use App\Http\Controllers\Auth\NewPasswordController;
+use App\Http\Controllers\API\InventoryItemController;
 use App\Http\Controllers\Admin\StaffAccountController;
 use App\Http\Controllers\API\ClinicCalendarController;
 use App\Http\Controllers\Staff\PatientVisitController;
 use App\Http\Controllers\API\AppointmentSlotController;
 use App\Http\Controllers\API\DentistScheduleController;
 use App\Http\Controllers\API\ServiceDiscountController;
+
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Admin\DeviceApprovalController;
-
+use App\Http\Controllers\API\InventorySettingsController;
 use App\Http\Controllers\API\AppointmentServiceController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\API\ClinicWeeklyScheduleController;
@@ -113,6 +116,10 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
     Route::get('/dentists/{id}', [DentistScheduleController::class, 'show']);
     Route::put('/dentists/{id}', [DentistScheduleController::class, 'update']);
     Route::delete('/dentists/{id}', [DentistScheduleController::class, 'destroy']);
+
+    //inventory
+    Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
+    Route::patch('/inventory/settings', [InventorySettingsController::class, 'update']);
 });
 
 // ------------------------
@@ -127,7 +134,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/clinic-calendar/resolve', [ClinicCalendarController::class, 'resolve']);
     Route::get('/clinic-calendar/alerts', [ClinicCalendarController::class, 'upcomingClosures']);
     Route::get('/me/closure-impacts', [ClinicCalendarController::class, 'myClosureImpacts']);
-    
+
     // Appointment (patient side)
     Route::prefix('appointment')->group(function () {
         Route::get('/available-services', [AppointmentServiceController::class, 'availableServices']);
@@ -148,6 +155,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/notifications/unread-count', [NotificationController::class, 'unreadCount']);
     Route::post('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
     Route::get('/notifications/mine', [NotificationController::class, 'mine'])->middleware('throttle:30,1');
+
+    Route::prefix('inventory')->group(function () {
+
+        Route::get('/items', [InventoryItemController::class, 'index']);
+        Route::post('/items', [InventoryItemController::class, 'store']);
+
+        Route::post('/receive', [InventoryController::class, 'receive']);
+        Route::post('/consume', [InventoryController::class, 'consume']);
+
+        Route::get('/settings', [InventorySettingsController::class, 'show']);
+
+        Route::put('/items/{item}', [InventoryItemController::class, 'update']);
+        Route::delete('/items/{item}', [InventoryItemController::class, 'destroy']);
+        Route::get('/items/{item}/batches', [InventoryController::class, 'batches']);
+        Route::get('/suppliers', [InventoryController::class, 'suppliers']);
+        Route::post('/suppliers', [InventoryController::class, 'storeSupplier']);
+    });
 });
 
 // ------------------------

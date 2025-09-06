@@ -4,6 +4,14 @@ import { lazy, Suspense } from "react";
 
 import LandingPage from "../pages/LandingPage";
 
+import InventoryPage from "../pages/Inventory/InventoryPage";
+import {
+  Gate,
+  isAdmin,
+  canStaffReceive,
+  canConsumeForFinishedVisit,
+} from "../components/RouteGuards";
+
 // Auth pages
 import Login from "../pages/Login";
 import Register from "../pages/Register";
@@ -34,6 +42,7 @@ import StaffDashboard from "../pages/Staff/StaffDashboard";
 import StaffProfile from "../pages/Staff/StaffProfile";
 import StaffAppointmentManager from "../pages/Staff/StaffAppointmentManager"; // Appointment management
 import AppointmentReminders from "../pages/Staff/AppointmentReminders";
+import ConsumeStockPage from "../pages/Staff/ConsumeStockPage";
 
 // Patient layout and pages
 import PatientLayout from "../layouts/PatientLayout";
@@ -41,7 +50,7 @@ import BookAppointment from "../pages/Patient/BookAppointment";
 import PatientProfile from "../pages/Patient/PatientProfile";
 import PatientAppointments from "../pages/Patient/PatientAppointments";
 
-// 
+//
 import NotificationsPage from "../pages/NotificationsPage";
 
 export default function AppRouter() {
@@ -83,6 +92,14 @@ export default function AppRouter() {
               </Suspense>
             }
           />
+          <Route
+            path="inventory"
+            element={
+              <Gate allow={({ user }) => user?.role === "admin"} to="/admin">
+                <InventoryPage />
+              </Gate>
+            }
+          />
           {/* Add more admin routes as needed */}
         </Route>
 
@@ -94,6 +111,31 @@ export default function AppRouter() {
           <Route
             path="appointment-reminders"
             element={<AppointmentReminders />}
+          />
+          <Route
+            path="inventory"
+            element={
+              <Gate allow={canStaffReceive} to="/staff">
+                <InventoryPage />
+              </Gate>
+            }
+          />
+          <Route //// inside onFinish handler navigate(`/staff/visits/${visit.id}/consume`, { state: { visitFinished: true } });
+            path="visits/:id/consume"
+            element={
+              <Gate
+                allow={({ user, settings }) =>
+                  canConsumeForFinishedVisit({
+                    user,
+                    settings,
+                    visitFinished: true,
+                  })
+                }
+                to="/staff"
+              >
+                <ConsumeStockPage />
+              </Gate>
+            }
           />
           {/* Add more staff routes as needed */}
         </Route>

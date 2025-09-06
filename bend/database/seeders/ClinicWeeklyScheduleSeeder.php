@@ -17,13 +17,13 @@ class ClinicWeeklyScheduleSeeder extends Seeder
         $now = Carbon::now()->toDateTimeString();
 
         $defaults = [
-            ['weekday' => 0, 'is_open' => false, 'open_time' => null, 'close_time' => null, 'dentist_count' => 0, 'note' => 'Closed on Sunday'],
-            ['weekday' => 1, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'dentist_count' => 2, 'note' => null],
-            ['weekday' => 2, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'dentist_count' => 2, 'note' => null],
-            ['weekday' => 3, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'dentist_count' => 2, 'note' => null],
-            ['weekday' => 4, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'dentist_count' => 2, 'note' => null],
-            ['weekday' => 5, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'dentist_count' => 2, 'note' => null],
-            ['weekday' => 6, 'is_open' => false, 'open_time' => null, 'close_time' => null, 'dentist_count' => 0, 'note' => 'Closed on Saturday'],
+            ['weekday' => 0, 'is_open' => false, 'open_time' => null, 'close_time' => null, 'note' => 'Closed on Sunday'],
+            ['weekday' => 1, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'note' => null],
+            ['weekday' => 2, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'note' => null],
+            ['weekday' => 3, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'note' => null],
+            ['weekday' => 4, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'note' => null],
+            ['weekday' => 5, 'is_open' => true, 'open_time' => '08:00', 'close_time' => '17:00', 'note' => null],
+            ['weekday' => 6, 'is_open' => false, 'open_time' => null, 'close_time' => null, 'note' => 'Closed on Saturday'],
         ];
 
         foreach ($defaults as &$day) {

@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import api from "../api/api";
 import "./AdminLayout.css";
+import NotificationsBell from "../components/NotificationBell";
 
 function AdminLayout() {
   const navigate = useNavigate();
@@ -22,7 +23,15 @@ function AdminLayout() {
         className="bg-dark text-white p-3"
         style={{ width: "250px", minHeight: "100vh" }}
       >
-        <h4>Admin Panel</h4>
+        <div
+          className="sidebar-header sticky-top bg-dark pb-2 mb-3 border-bottom border-secondary d-flex align-items-center justify-content-between"
+          style={{ zIndex: 1 }}
+        >
+          <h4 className="m-0">Admin Panel</h4>
+          <div className="ms-2">
+            <NotificationsBell />
+          </div>
+        </div>
         <ul className="nav flex-column">
           <li className="nav-item">
             <NavLink
@@ -35,6 +44,7 @@ function AdminLayout() {
               🏠 Dashboard
             </NavLink>
           </li>
+
           <li className="nav-item">
             <NavLink
               to="/admin/device-approvals"
@@ -55,6 +65,7 @@ function AdminLayout() {
               ✅ Approved Devices
             </NavLink>
           </li>
+
           <li className="nav-item">
             <NavLink
               to="/admin/staff-register"
@@ -65,6 +76,7 @@ function AdminLayout() {
               👥 Create Staff Account
             </NavLink>
           </li>
+
           <li className="nav-item">
             <NavLink
               to="/admin/schedule"
@@ -85,6 +97,7 @@ function AdminLayout() {
               🧑‍⚕️ Dentists
             </NavLink>
           </li>
+
           <li className="nav-item">
             <NavLink
               to="/admin/services"
@@ -115,6 +128,19 @@ function AdminLayout() {
               📁 Promo Archive
             </NavLink>
           </li>
+
+          {/* --- Inventory --- */}
+          <li className="nav-item mt-2">
+            <NavLink
+              to="/admin/inventory"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
+              📦 Inventory
+            </NavLink>
+          </li>
+
           <li className="nav-item">
             <NavLink
               to="/admin/profile"
@@ -125,6 +151,7 @@ function AdminLayout() {
               👤 Account
             </NavLink>
           </li>
+
           <li className="nav-item mt-4">
             <button
               className="btn btn-outline-danger w-100"
