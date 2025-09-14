@@ -1,13 +1,13 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://127.0.0.1:8000', // ✅ Match exactly with browser origin
+  baseURL: 'https://e7e603832341.ngrok-free.app', // ✅ Match exactly with browser origin
   withCredentials: true,
   headers: {
     'X-Requested-With': 'XMLHttpRequest',
   }
 });
-
+//http://127.0.0.1:8000
 // 🩹 Inject X-XSRF-TOKEN manually from cookie if needed
 api.interceptors.request.use(config => {
   const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);

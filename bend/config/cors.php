@@ -19,7 +19,11 @@ return [
 
     'allowed_methods' => ['*'],
 
-    'allowed_origins' => ['http://127.0.0.1:5173'],
+    'allowed_origins' => [
+        'http://127.0.0.1:5173',
+        'https://it-42-capstone.vercel.app',
+        'https://e7e603832341.ngrok-free.app',
+    ],
 
     'allowed_origins_patterns' => [],
 
