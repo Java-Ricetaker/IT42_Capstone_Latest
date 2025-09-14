@@ -5,6 +5,7 @@ const api = axios.create({
   withCredentials: true,
   headers: {
     'X-Requested-With': 'XMLHttpRequest',
+    'ngrok-skip-browser-warning': 'true',
   }
 });
 //http://127.0.0.1:8000
