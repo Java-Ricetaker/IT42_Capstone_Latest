@@ -58,7 +58,7 @@ import PayCancel from "../pages/payments/PayCancel";
 
 export default function AppRouter() {
   return (
-    <BrowserRouter>
+    <BrowserRouter basename="/app">
       <AuthRedirector /> {/* Redirects based on auth state */}
       <Routes>
         {/* Public / Auth Routes */}

@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'https://e7e603832341.ngrok-free.app', // ✅ Match exactly with browser origin
+  baseURL: '', // ✅ Match exactly with browser origin
   withCredentials: true,
   headers: {
     'X-Requested-With': 'XMLHttpRequest',
