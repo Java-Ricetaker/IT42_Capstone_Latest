@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'maya' => [
+        'public' => env('MAYA_PUBLIC_KEY'),
+        'secret' => env('MAYA_SECRET_KEY'),
+    ],
 ];

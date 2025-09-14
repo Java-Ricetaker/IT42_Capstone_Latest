@@ -52,6 +52,9 @@ import PatientAppointments from "../pages/Patient/PatientAppointments";
 
 //
 import NotificationsPage from "../pages/NotificationsPage";
+import PaySuccess from "../pages/payments/PaySuccess";
+import PayFailure from "../pages/payments/PayFailure";
+import PayCancel from "../pages/payments/PayCancel";
 
 export default function AppRouter() {
   return (
@@ -146,6 +149,10 @@ export default function AppRouter() {
           <Route path="profile" element={<PatientProfile />} />
           <Route path="appointments" element={<PatientAppointments />} />
         </Route>
+        {/* Payment Result Routes */}
+        <Route path="/pay/success" element={<PaySuccess />} />
+        <Route path="/pay/failure" element={<PayFailure />} />
+        <Route path="/pay/cancel" element={<PayCancel />} />
         {/* Catch-all for 404 */}
         <Route path="*" element={<div>404 Not Found</div>} />
       </Routes>

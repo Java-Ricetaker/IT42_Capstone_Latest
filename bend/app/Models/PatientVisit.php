@@ -36,4 +36,14 @@ class PatientVisit extends Model
     {
         return $this->belongsTo(Service::class);
     }
+
+    public function payments()
+    {
+        return $this->hasMany(\App\Models\Payment::class);
+    }
+
+    public function latestPayment()
+    {
+        return $this->hasOne(\App\Models\Payment::class)->latestOfMany();
+    }
 }

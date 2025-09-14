@@ -3,16 +3,17 @@
 use Illuminate\Http\Request;
 use App\Http\Middleware\AdminOnly;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\API\PatientController;
+use App\Http\Controllers\API\MayaController;
 
+use App\Http\Controllers\API\PatientController;
 use App\Http\Controllers\API\ServiceController;
 use App\Http\Middleware\EnsureDeviceIsApproved;
 use App\Http\Controllers\DeviceStatusController;
+
 use App\Http\Controllers\API\InventoryController;
-
 use App\Http\Controllers\API\AppointmentController;
-use App\Http\Controllers\API\NotificationController;
 
+use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\API\InventoryItemController;
 use App\Http\Controllers\Admin\StaffAccountController;
@@ -20,8 +21,8 @@ use App\Http\Controllers\API\ClinicCalendarController;
 use App\Http\Controllers\Staff\PatientVisitController;
 use App\Http\Controllers\API\AppointmentSlotController;
 use App\Http\Controllers\API\DentistScheduleController;
-use App\Http\Controllers\API\ServiceDiscountController;
 
+use App\Http\Controllers\API\ServiceDiscountController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Admin\DeviceApprovalController;
 use App\Http\Controllers\API\InventorySettingsController;
@@ -172,6 +173,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/suppliers', [InventoryController::class, 'suppliers']);
         Route::post('/suppliers', [InventoryController::class, 'storeSupplier']);
     });
+
+    Route::post('/maya/payments', [MayaController::class, 'createPayment']);   // returns redirect_url
+    Route::get('/maya/payments/{paymentId}/status', [MayaController::class, 'status']); // optional poll
+    Route::post('/maya/webhook', [MayaController::class, 'webhook']);         // Maya -> your app
 });
 
 // ------------------------

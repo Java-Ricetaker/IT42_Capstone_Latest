@@ -6,15 +6,17 @@ function PatientAppointments() {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [meta, setMeta] = useState({}); // for pagination metadata
+  const [meta, setMeta] = useState({});
+  const [paying, setPaying] = useState(null); // appointment_id being processed
 
   useEffect(() => {
-    fetchAppointments(currentPage); // Use state for page
+    fetchAppointments(currentPage);
   }, [currentPage]);
 
   const fetchAppointments = async (page = 1) => {
     try {
       const res = await api.get(`/api/user-appointments?page=${page}`);
+      // Expect each item to include: payment_method, payment_status, status, service{name}, notes, date
       setAppointments(res.data.data);
       setMeta({
         current_page: res.data.current_page,
@@ -30,17 +32,44 @@ function PatientAppointments() {
   };
 
   const handleCancel = async (id) => {
-    if (!window.confirm("Are you sure you want to cancel this appointment?"))
-      return;
-
+    if (!window.confirm("Are you sure you want to cancel this appointment?")) return;
     try {
       await api.post(`/api/appointment/${id}/cancel`);
       alert("Appointment canceled.");
-      fetchAppointments(currentPage); // Refresh
+      fetchAppointments(currentPage);
     } catch (err) {
       console.error("Cancel failed", err);
       alert("Failed to cancel appointment.");
     }
+  };
+
+  const handlePayNow = async (appointmentId) => {
+    try {
+      setPaying(appointmentId);
+      // Backend computes amount and creates Maya one-time payment, returns { redirect_url }
+      const { data } = await api.post("/api/maya/payments", { appointment_id: appointmentId });
+      if (data?.redirect_url) {
+        window.location.href = data.redirect_url; // go to Maya payment page
+      } else {
+        alert("Payment link not available. Please try again.");
+      }
+    } catch (err) {
+      console.error("Create Maya payment failed", err);
+      alert("Unable to start payment. Please try again.");
+    } finally {
+      setPaying(null);
+    }
+  };
+
+  const renderStatusBadge = (status) => {
+    const map = {
+      approved: "bg-success",
+      pending: "bg-warning text-dark",
+      rejected: "bg-danger",
+      cancelled: "bg-secondary text-white fw-semibold",
+      completed: "bg-primary",
+    };
+    return <span className={`badge ${map[status] || "bg-secondary"}`}>{status}</span>;
   };
 
   return (
@@ -60,39 +89,66 @@ function PatientAppointments() {
               <tr>
                 <th>Date</th>
                 <th>Service</th>
-                <th>Payment</th>
-                <th>Status</th>
+                <th>Payment Method</th>
+                <th>Payment Status</th>
+                <th>Appt. Status</th>
                 <th>Note</th>
+                <th style={{ width: 160 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {appointments.map((a) => (
-                <tr key={a.id}>
-                  <td>{a.date}</td>
-                  <td>{a.service?.name || "—"}</td>
-                  <td>{a.payment_method}</td>
-                  <td>
-                    <span
-                      className={`badge ${
-                        a.status === "approved"
+              {appointments.map((a) => {
+                const showPayNow =
+                  a.payment_method === "maya" &&
+                  a.payment_status === "awaiting_payment";
+                  // optionally also require approval:
+                  // && a.status === "approved";
+
+                return (
+                  <tr key={a.id}>
+                    <td>{a.date}</td>
+                    <td>{a.service?.name || "—"}</td>
+                    <td className="text-capitalize">{a.payment_method}</td>
+                    <td>
+                      <span className={`badge ${a.payment_status === "paid"
                           ? "bg-success"
-                          : a.status === "pending"
+                          : a.payment_status === "awaiting_payment"
                           ? "bg-warning text-dark"
-                          : a.status === "rejected"
-                          ? "bg-danger"
-                          : a.status === "cancelled"
-                          ? "bg-secondary text-white fw-semibold"
                           : "bg-secondary"
-                      }`}
-                    >
-                      {a.status}
-                    </span>
-                  </td>
-                  <td className="text-muted small">{a.notes || "—"}</td>
-                </tr>
-              ))}
+                        }`}>
+                        {a.payment_status}
+                      </span>
+                    </td>
+                    <td>{renderStatusBadge(a.status)}</td>
+                    <td className="text-muted small">{a.notes || "—"}</td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
+                        {showPayNow && (
+                          <button
+                            className="btn btn-primary btn-sm"
+                            onClick={() => handlePayNow(a.id)}
+                            disabled={paying === a.id}
+                          >
+                            {paying === a.id ? "Redirecting..." : "Pay now"}
+                          </button>
+                        )}
+
+                        {a.status !== "cancelled" && a.status !== "rejected" && (
+                          <button
+                            className="btn btn-outline-danger btn-sm"
+                            onClick={() => handleCancel(a.id)}
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
+
           <div className="d-flex justify-content-between align-items-center mt-3">
             <button
               className="btn btn-outline-secondary btn-sm"
