@@ -1,31 +1,44 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '', // ✅ Match exactly with browser origin
+  baseURL: '', // same-origin; Laravel + SPA via ngrok
   withCredentials: true,
   headers: {
     'X-Requested-With': 'XMLHttpRequest',
     'ngrok-skip-browser-warning': 'true',
   }
 });
-//http://127.0.0.1:8000
-// 🩹 Inject X-XSRF-TOKEN manually from cookie if needed
+
+// Inject XSRF token from cookie
 api.interceptors.request.use(config => {
-  const match = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
-  if (match) {
-    config.headers['X-XSRF-TOKEN'] = decodeURIComponent(match[1]);
-  }
+  const m = document.cookie.match(/XSRF-TOKEN=([^;]+)/);
+  if (m) config.headers['X-XSRF-TOKEN'] = decodeURIComponent(m[1]);
   return config;
 });
 
+// Be gentle on 401s — don't kick users out for harmless probes
 api.interceptors.response.use(
-  response => response,
-  error => {
-    const config = error.config || {};
+  (response) => response,
+  (error) => {
+    const cfg = error.config || {};
+    const status = error.response?.status;
+    const url = cfg.url || '';
 
-    if (error.response?.status === 401 && !config.skip401Handler) {
-      localStorage.removeItem('token');
-      window.location.href = '/';
+    // Ignore 401s when explicitly requested
+    if (cfg.skip401Handler) {
+      return Promise.reject(error);
+    }
+
+    // Ignore 401 from "who am I" style checks
+    if (status === 401 && (url.includes('/api/user') || url.includes('/user'))) {
+      return Promise.reject(error);
+    }
+
+    // Otherwise, send to login within SPA base (/app)
+    if (status === 401) {
+      try { localStorage.removeItem('token'); } catch {}
+      window.location.href = '/app/login';
+      return; // stop promise chain
     }
 
     return Promise.reject(error);

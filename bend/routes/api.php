@@ -174,9 +174,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/suppliers', [InventoryController::class, 'storeSupplier']);
     });
 
-    Route::post('/maya/payments', [MayaController::class, 'createPayment']);   // returns redirect_url
-    Route::get('/maya/payments/{paymentId}/status', [MayaController::class, 'status']); // optional poll
-    Route::post('/maya/webhook', [MayaController::class, 'webhook']);         // Maya -> your app
+    // Create payment (user must be logged in)
+    Route::post('/maya/payments', [MayaController::class, 'createPayment']);
+
+    // If you prefer status behind auth, keep it here instead of public:
+    Route::get('/maya/payments/{paymentId}/status', [MayaController::class, 'status']);
 });
 
 // ------------------------
@@ -214,3 +216,5 @@ Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(functi
 // ------------------------
 Route::middleware('auth:sanctum')->get('/services', [ServiceController::class, 'index']);
 Route::middleware('auth:sanctum')->get('/services/{service}', [ServiceController::class, 'show']);
+Route::post('/maya/webhook', [MayaController::class, 'webhook'])
+    ->middleware('throttle:120,1');

@@ -10,13 +10,26 @@ function PatientAppointments() {
   const [paying, setPaying] = useState(null); // appointment_id being processed
 
   useEffect(() => {
-    fetchAppointments(currentPage);
+    (async () => {
+      try {
+        // ✅ prime CSRF once before any authenticated API calls
+        await api.get("/sanctum/csrf-cookie");
+      } catch (e) {
+        // don't block; fetch may still work if cookie already present
+        console.warn("CSRF prime failed (will retry later)", e);
+      } finally {
+        fetchAppointments(currentPage);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
   const fetchAppointments = async (page = 1) => {
     try {
-      const res = await api.get(`/api/user-appointments?page=${page}`);
-      // Expect each item to include: payment_method, payment_status, status, service{name}, notes, date
+      const res = await api.get(`/api/user-appointments?page=${page}`, {
+        // this route often probes auth; ignore 401 auto-redirects
+        skip401Handler: true,
+      });
       setAppointments(res.data.data);
       setMeta({
         current_page: res.data.current_page,
@@ -46,16 +59,31 @@ function PatientAppointments() {
   const handlePayNow = async (appointmentId) => {
     try {
       setPaying(appointmentId);
-      // Backend computes amount and creates Maya one-time payment, returns { redirect_url }
-      const { data } = await api.post("/api/maya/payments", { appointment_id: appointmentId });
+
+      // ✅ 1) make sure we have fresh CSRF + session
+      await api.get("/sanctum/csrf-cookie");
+
+      // ✅ 2) let backend compute amount + create Maya checkout
+      const { data } = await api.post(
+        "/api/maya/payments",
+        { appointment_id: appointmentId },
+        { skip401Handler: true }
+      );
+
       if (data?.redirect_url) {
-        window.location.href = data.redirect_url; // go to Maya payment page
+        // ✅ 3) go to Maya sandbox hosted page
+        window.location.href = data.redirect_url;
       } else {
         alert("Payment link not available. Please try again.");
       }
     } catch (err) {
       console.error("Create Maya payment failed", err);
-      alert("Unable to start payment. Please try again.");
+      // surface server hint if available
+      const serverMsg =
+        err.response?.data?.message ||
+        err.response?.data?.maya?.message ||
+        "Unable to start payment. Please try again.";
+      alert(serverMsg);
     } finally {
       setPaying(null);
     }
@@ -101,8 +129,6 @@ function PatientAppointments() {
                 const showPayNow =
                   a.payment_method === "maya" &&
                   a.payment_status === "awaiting_payment";
-                  // optionally also require approval:
-                  // && a.status === "approved";
 
                 return (
                   <tr key={a.id}>
@@ -110,12 +136,15 @@ function PatientAppointments() {
                     <td>{a.service?.name || "—"}</td>
                     <td className="text-capitalize">{a.payment_method}</td>
                     <td>
-                      <span className={`badge ${a.payment_status === "paid"
-                          ? "bg-success"
-                          : a.payment_status === "awaiting_payment"
-                          ? "bg-warning text-dark"
-                          : "bg-secondary"
-                        }`}>
+                      <span
+                        className={`badge ${
+                          a.payment_status === "paid"
+                            ? "bg-success"
+                            : a.payment_status === "awaiting_payment"
+                            ? "bg-warning text-dark"
+                            : "bg-secondary"
+                        }`}
+                      >
                         {a.payment_status}
                       </span>
                     </td>
