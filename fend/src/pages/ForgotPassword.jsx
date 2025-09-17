@@ -47,42 +47,68 @@ function ForgotPassword() {
   return (
     <AuthLayout>
       {loading && <LoadingSpinner message="Sending reset link..." />}
-      <div className="card shadow-sm p-4" style={{ width: '100%', maxWidth: '500px' }}>
-        <h3 className="text-center mb-4">
-          {fromProfile ? 'Send Password Reset Link' : 'Forgot Password'}
-        </h3>
 
-        <form onSubmit={handleSubmit}>
-          <div className="mb-3">
-            <label className="form-label">
-              <i className="bi bi-envelope me-2" />
-              Email Address
-            </label>
-            <input
-              type="email"
-              className="form-control"
-              value={email}
-              readOnly={fromProfile}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-            />
+      {/* ✅ Full page center using px */}
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          height: '100vh',
+          padding: '20px', // px for spacing
+          backgroundColor: '#f8f9fa',
+        }}
+      >
+        <div
+          className="card shadow-sm p-4"
+          style={{
+            width: '400px', // ✅ fixed px width
+            padding: '30px',
+            borderRadius: '12px',
+            boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
+            backgroundColor: '#fff',
+          }}
+        >
+          <h3 className="text-center mb-4">
+            {fromProfile ? 'Send Password Reset Link' : 'Forgot Password'}
+          </h3>
+
+          <form onSubmit={handleSubmit}>
+            <div className="mb-3">
+              <label className="form-label">
+                <i className="bi bi-envelope me-2" />
+                Email Address
+              </label>
+              <input
+                type="email"
+                className="form-control"
+                value={email}
+                readOnly={fromProfile}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
+            </div>
+
+            <button type="submit" className="btn btn-primary w-100">
+              <i className="bi bi-send me-2" />
+              Send Reset Link
+            </button>
+          </form>
+
+          {message && (
+            <div className="alert alert-success text-center mt-3">{message}</div>
+          )}
+          {error && (
+            <div className="alert alert-danger text-center mt-3">{error}</div>
+          )}
+
+          <div className="text-center mt-3">
+            <Link to="/login" className="d-block text-decoration-none text-primary">
+              <i className="bi bi-arrow-left me-2" />
+              Back to Login
+            </Link>
           </div>
-
-          <button type="submit" className="btn btn-primary w-100">
-            <i className="bi bi-send me-2" />
-            Send Reset Link
-          </button>
-        </form>
-
-        {message && <div className="alert alert-success text-center mt-3">{message}</div>}
-        {error && <div className="alert alert-danger text-center mt-3">{error}</div>}
-
-        <div className="text-center mt-3">
-          <Link to="/login" className="d-block text-decoration-none text-primary">
-            <i className="bi bi-arrow-left me-2" />
-            Back to Login
-          </Link>
         </div>
       </div>
     </AuthLayout>

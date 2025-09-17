@@ -55,6 +55,11 @@ import NotificationsPage from "../pages/NotificationsPage";
 import PaySuccess from "../pages/payments/PaySuccess";
 import PayFailure from "../pages/payments/PayFailure";
 import PayCancel from "../pages/payments/PayCancel";
+//
+
+
+// import 'bootstrap/dist/css/bootstrap.min.css';
+// import 'bootstrap-icons/font/bootstrap-icons.css';
 
 export default function AppRouter() {
   return (
