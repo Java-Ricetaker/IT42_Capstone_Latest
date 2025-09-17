@@ -38,6 +38,10 @@ class MayaController extends Controller
             'reference_no' => 'PAY-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(6)),
             'created_by' => auth()->id(),
         ]);
+        \Log::info('payments.db', [
+            'db' => \DB::selectOne('select database() as db')->db
+        ]);
+        
 
         // PUBLIC key for create (Basic <base64(publicKey:)>)
         $publicKey = (string) config('services.maya.public');
