@@ -378,6 +378,7 @@ function DateField({ label, value, onChange }) {
         className="w-full mt-1 rounded-xl border border-zinc-300 dark:border-zinc-700 bg-transparent p-2 text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
         value={onlyDate(value)}
         onChange={(e) => onChange(e.target.value)}
+        min={label === 'Expiry Date' ? tomorrow() : undefined}
       />
     </div>
   );
@@ -395,6 +396,12 @@ function onlyDate(v) {
   if (!v) return "";
   const s = String(v);
   return s.includes("T") ? s.split("T")[0] : s;
+}
+
+function tomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
 }
 
 function parseErr(e) {

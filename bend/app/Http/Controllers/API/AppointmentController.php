@@ -439,4 +439,116 @@ class AppointmentController extends Controller
         return Carbon::createFromFormat(strlen($time) === 8 ? 'H:i:s' : 'H:i', $time)->format('H:i');
     }
 
+    /**
+     * POST /api/appointments/{id}/hmo/reveal
+     * Body: { password: string }
+     * Requires role admin|staff and correct current password
+     * Returns decrypted HMO info for the appointment's patient_hmo_id
+     */
+    public function revealHmo(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user || !in_array($user->role, ['admin', 'staff'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $data = $request->validate([
+            'password' => ['required', 'string'],
+        ]);
+
+        if (!\Illuminate\Support\Facades\Hash::check($data['password'], $user->password)) {
+            return response()->json(['message' => 'Invalid password'], 401);
+        }
+
+        $appointment = Appointment::findOrFail($id);
+        if (!$appointment->patient_hmo_id) {
+            return response()->json(['message' => 'No HMO selected for this appointment'], 422);
+        }
+
+        $hmo = \App\Models\PatientHmo::findOrFail($appointment->patient_hmo_id);
+
+        return response()->json([
+            'provider_name' => $hmo->provider_name,
+            'member_id'     => $hmo->member_id_encrypted,
+            'policy_no'     => $hmo->policy_no_encrypted,
+            'effective_date'=> $hmo->effective_date,
+            'expiry_date'   => $hmo->expiry_date,
+        ]);
+    }
+
+    /**
+     * POST /api/appointments/{id}/hmo/notify
+     * Body: { message: string, coverage_amount?: number, approve?: boolean }
+     */
+    public function notifyHmoCoverage(Request $request, $id)
+    {
+        $user = $request->user();
+        if (!$user || !in_array($user->role, ['admin', 'staff'])) {
+            return response()->json(['message' => 'Forbidden'], 403);
+        }
+
+        $v = $request->validate([
+            'message'         => ['required', 'string', 'max:1000'],
+            'coverage_amount' => ['nullable', 'numeric', 'min:0'],
+            'approve'         => ['sometimes', 'boolean'],
+        ]);
+
+        $appointment = Appointment::with(['patient', 'service'])->findOrFail($id);
+        $patient = $appointment->patient;
+        if (!$patient || !$patient->user_id) {
+            return response()->json(['message' => 'Patient is not linked to a user'], 422);
+        }
+
+        $servicePrice = $appointment->service?->price ?? null;
+        $coverage = isset($v['coverage_amount']) ? (float) $v['coverage_amount'] : null;
+        $balance  = ($servicePrice !== null && $coverage !== null) ? max(0, (float)$servicePrice - $coverage) : null;
+
+        $noteLines = [];
+        $noteLines[] = '[HMO Review] ' . trim($v['message']);
+        if ($coverage !== null) $noteLines[] = 'Coverage: ' . number_format($coverage, 2);
+        if ($balance !== null) $noteLines[] = 'Estimated balance: ' . number_format($balance, 2);
+        $appointment->notes = trim(implode("\n", array_filter($noteLines)));
+        $appointment->save();
+
+        \Illuminate\Support\Facades\DB::transaction(function () use ($user, $patient, $coverage, $balance, $v) {
+            $noticeId = \Illuminate\Support\Facades\DB::table('notifications')->insertGetId([
+                'type'            => 'hmo_coverage',
+                'title'           => 'HMO Coverage Update',
+                'body'            => $v['message'],
+                'severity'        => 'info',
+                'scope'           => 'targeted',
+                'audience_roles'  => null,
+                'effective_from'  => now(),
+                'effective_until' => null,
+                'data'            => json_encode([
+                    'patient_id'      => $patient->id,
+                    'coverage_amount' => $coverage,
+                    'balance_due'     => $balance,
+                    'by_user_id'      => $user->id,
+                ]),
+                'created_by'      => $user->id,
+                'created_at'      => now(),
+                'updated_at'      => now(),
+            ]);
+
+            \Illuminate\Support\Facades\DB::table('notification_targets')->upsert([
+                [
+                    'notification_id' => $noticeId,
+                    'user_id'         => $patient->user_id,
+                    'created_at'      => now(),
+                    'updated_at'      => now(),
+                ]
+            ], ['notification_id','user_id'], []);
+        });
+
+        if (!empty($v['approve']) && $appointment->status === 'pending') {
+            $appointment->status = 'approved';
+            $appointment->save();
+        }
+
+        return response()->json([
+            'message' => 'Coverage noted and patient notified',
+            'balance_due' => $balance,
+        ]);
+    }
 }

@@ -3,6 +3,21 @@ import { useState, useEffect } from "react";
 import api from "../../api/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
 import HmoPicker from "../../components/HmoPicker";
+// date helpers
+function todayStr() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+function tomorrowStr() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+function sevenDaysOutStr() {
+  const d = new Date();
+  d.setDate(d.getDate() + 7);
+  return d.toISOString().slice(0, 10);
+}
 
 function BookAppointment() {
   const navigate = useNavigate();
@@ -29,29 +44,11 @@ function BookAppointment() {
     (async () => {
       setLoadingPatientId(true);
       try {
-        // Try a couple of common "me" endpoints, ignore errors
-        const tryEndpoints = [
-          "/api/patients/me",
-          "/api/patient/me",
-          "/api/me/patient",
-        ];
-        for (const url of tryEndpoints) {
-          try {
-            const { data } = await api.get(url);
-            const pid =
-              data?.id ??
-              data?.patient_id ??
-              data?.patient?.id ??
-              data?.user?.patient?.id ??
-              null;
-            if (pid && mounted) {
-              setMyPatientId(Number(pid));
-              break;
-            }
-          } catch (_) {
-            // continue to next endpoint
-          }
-        }
+        const { data } = await api.get("/api/user");
+        const pid = data?.patient?.id ?? null;
+        if (mounted && pid) setMyPatientId(Number(pid));
+      } catch (_) {
+        // ignore; HMO section will show a warning
       } finally {
         if (mounted) setLoadingPatientId(false);
       }
@@ -157,6 +154,8 @@ function BookAppointment() {
           className="form-control"
           value={selectedDate}
           onChange={handleDateChange}
+          min={tomorrowStr()}
+          max={sevenDaysOutStr()}
         />
       </div>
 

@@ -67,7 +67,7 @@ export default function AppRouter() {
       <AuthRedirector /> {/* Redirects based on auth state */}
       <Routes>
         {/* Public / Auth Routes */}
-        <Route path="/app" element={<LandingPage />} />
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
@@ -108,6 +108,8 @@ export default function AppRouter() {
               </Gate>
             }
           />
+          {/* Mirror Staff Appointments under Admin */}
+          <Route path="appointments" element={<StaffAppointmentManager />} />
           {/* Add more admin routes as needed */}
         </Route>
 

@@ -13,7 +13,7 @@ Route::get('/{any}', function () {
 })->where('any', '^(?!api)(?!sanctum)(?!storage).*$');
 
 Route::get('/', function () {
-    return ['Laravel' => app()->version()];
+    return redirect('/app');
 });
 
 

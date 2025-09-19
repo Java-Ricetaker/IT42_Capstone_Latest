@@ -100,6 +100,17 @@ function AdminLayout() {
 
           <li className="nav-item">
             <NavLink
+              to="/admin/appointments"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
+              📅 Appointments
+            </NavLink>
+          </li>
+
+          <li className="nav-item">
+            <NavLink
               to="/admin/services"
               className={({ isActive }) =>
                 "nav-link text-white" + (isActive ? " fw-bold" : "")

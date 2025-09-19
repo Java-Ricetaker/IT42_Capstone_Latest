@@ -146,6 +146,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/resolve/{code}', [AppointmentController::class, 'resolveReferenceCode']);
     });
 
+    // HMO verification and notification by staff/admin (per appointment)
+    Route::post('/appointments/{id}/hmo/reveal', [AppointmentController::class, 'revealHmo']);
+    Route::post('/appointments/{id}/hmo/notify', [AppointmentController::class, 'notifyHmoCoverage']);
+
     Route::get('/patients', [PatientController::class, 'index']);
 
     // Patient linking
