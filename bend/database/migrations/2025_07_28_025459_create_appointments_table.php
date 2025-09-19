@@ -13,15 +13,24 @@ return new class extends Migration {
             $table->foreignId('patient_id')->constrained()->onDelete('cascade');
             $table->foreignId('service_id')->constrained()->onDelete('cascade');
 
+            // 🔹 NEW: link chosen HMO if applicable
+            $table->foreignId('patient_hmo_id')
+                ->nullable()
+                ->constrained('patient_hmos')
+                ->nullOnDelete();
+
             // booking fields
-            $table->date('date');                 // was "scheduled_date" in some older drafts
-            $table->string('time_slot');          // e.g., "08:00-09:00"
+            $table->date('date');                // was "scheduled_date" in some older drafts
+            $table->string('time_slot');         // e.g., "08:00-09:00"
             $table->string('reference_code')->unique()->nullable();
 
             // states
-            $table->enum('status', ['pending', 'approved', 'rejected', 'cancelled', 'completed'])->default('pending');
-            $table->enum('payment_method', ['cash', 'maya', 'hmo'])->default('cash');
-            $table->enum('payment_status', ['unpaid', 'awaiting_payment', 'paid'])->default('unpaid');
+            $table->enum('status', ['pending', 'approved', 'rejected', 'cancelled', 'completed'])
+                  ->default('pending');
+            $table->enum('payment_method', ['cash', 'maya', 'hmo'])
+                  ->default('cash');
+            $table->enum('payment_status', ['unpaid', 'awaiting_payment', 'paid'])
+                  ->default('unpaid');
 
             // misc
             $table->text('notes')->nullable();
@@ -30,10 +39,10 @@ return new class extends Migration {
 
             $table->timestamps();
 
-            // ✅ valid indexes
+            // ✅ indexes
             $table->index(['patient_id', 'status', 'date']);
-            $table->index(['date', 'status']);   // common listing filter
-            $table->index('reference_code');     // for quick lookups by code
+            $table->index(['date', 'status']);
+            $table->index('reference_code');
         });
     }
 

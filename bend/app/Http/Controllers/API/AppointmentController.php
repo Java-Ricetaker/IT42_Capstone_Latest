@@ -17,115 +17,143 @@ use App\Services\ClinicDateResolverService;
 class AppointmentController extends Controller
 {
     public function store(Request $request, ClinicDateResolverService $resolver)
-    {
-        $validated = $request->validate([
-            'service_id' => 'required|exists:services,id',
-            'date' => 'required|date_format:Y-m-d|after:today',
-            // accept HH:MM or HH:MM:SS
-            'start_time' => ['required', 'regex:/^\d{2}:\d{2}(:\d{2})?$/'],
-            'payment_method' => ['required', Rule::in(['cash', 'maya', 'hmo'])],
-        ]);
+{
+    $validated = $request->validate([
+        'service_id'      => ['required', 'exists:services,id'],
+        'date'            => ['required', 'date_format:Y-m-d', 'after:today'],
+        // accept HH:MM or HH:MM:SS
+        'start_time'      => ['required', 'regex:/^\d{2}:\d{2}(:\d{2})?$/'],
+        'payment_method'  => ['required', Rule::in(['cash', 'maya', 'hmo'])],
+        // NEW: optional, required when payment_method = hmo
+        'patient_hmo_id'  => ['nullable', 'integer', 'exists:patient_hmos,id'],
+    ]);
 
-        $service = Service::findOrFail($validated['service_id']);
-        $blocksNeeded = (int) max(1, ceil($service->estimated_minutes / 30));
-        $dateStr = $validated['date'];
-        $date = Carbon::createFromFormat('Y-m-d', $dateStr)->startOfDay();
+    $service  = Service::findOrFail($validated['service_id']);
+    $blocksNeeded = (int) max(1, ceil($service->estimated_minutes / 30));
+    $dateStr  = $validated['date'];
+    $date     = Carbon::createFromFormat('Y-m-d', $dateStr)->startOfDay();
 
-        $startRaw = $validated['start_time'];
-        $startTime = Carbon::createFromFormat('H:i', $this->normalizeTime($startRaw));
+    $startRaw = $validated['start_time'];
+    $startTime = Carbon::createFromFormat('H:i', $this->normalizeTime($startRaw));
 
-        // booking window check (tomorrow .. +7)
-        $today = now()->startOfDay();
-        if ($date->lte($today) || $date->gt($today->copy()->addDays(7))) {
-            return response()->json(['message' => 'Date is outside the booking window.'], 422);
-        }
-
-        // resolve day snapshot
-        $snap = $resolver->resolve($date);
-        if (!$snap['is_open']) {
-            return response()->json(['message' => 'Clinic is closed on this date.'], 422);
-        }
-
-        $open = Carbon::parse($snap['open_time']);
-        $close = Carbon::parse($snap['close_time']);
-        $cap = (int) $snap['effective_capacity'];
-
-        // ensure start is in the 30‑min grid and inside hours
-        $grid = ClinicDateResolverService::buildBlocks($snap['open_time'], $snap['close_time']);
-        if (!in_array($startTime->format('H:i'), $grid, true)) {
-            return response()->json(['message' => 'Invalid start time (not on grid or outside hours).'], 422);
-        }
-
-        $endTime = $startTime->copy()->addMinutes($service->estimated_minutes);
-        if ($startTime->lt($open) || $endTime->gt($close)) {
-            return response()->json(['message' => 'Selected time is outside clinic hours.'], 422);
-        }
-
-        // build usage map (pending+approved)
-        $slotUsage = array_fill_keys($grid, 0);
-        $appointments = Appointment::whereDate('date', $dateStr)
-            ->whereIn('status', ['pending', 'approved'])
-            ->get(['time_slot']);
-
-        foreach ($appointments as $appt) {
-            if (!$appt->time_slot || strpos($appt->time_slot, '-') === false)
-                continue;
-
-            [$aStart, $aEnd] = explode('-', $appt->time_slot, 2);
-            $aStart = $this->normalizeTime(trim($aStart));
-            $aEnd = $this->normalizeTime(trim($aEnd));
-
-            $cur = Carbon::createFromFormat('H:i', $aStart);
-            $end = Carbon::createFromFormat('H:i', $aEnd);
-
-            while ($cur->lt($end)) {
-                $k = $cur->format('H:i');
-                if (isset($slotUsage[$k]))
-                    $slotUsage[$k] += 1;
-                $cur->addMinutes(30);
-            }
-        }
-
-
-        // per-block capacity check
-        $cursor = $startTime->copy();
-        for ($i = 0; $i < $blocksNeeded; $i++) {
-            $k = $cursor->format('H:i');
-            if (!array_key_exists($k, $slotUsage) || $slotUsage[$k] >= $cap) {
-                return response()->json(['message' => "Time slot starting at {$k} is already full."], 422);
-            }
-            $cursor->addMinutes(30);
-        }
-
-        // create appointment
-        $timeSlot = $this->normalizeTime($startTime) . '-' . $this->normalizeTime($endTime);
-
-        $patient = Patient::byUser(auth()->id());
-        if (!$patient) {
-            return response()->json([
-                'message' => 'Your account is not yet linked to a patient record. Please contact the clinic.',
-            ], 422);
-        }
-
-        $referenceCode = strtoupper(Str::random(8));
-
-        $appointment = Appointment::create([
-            'patient_id' => $patient->id,
-            'service_id' => $service->id,
-            'date' => $dateStr,
-            'time_slot' => $timeSlot,
-            'reference_code' => $referenceCode,
-            'status' => 'pending',
-            'payment_method' => $validated['payment_method'],
-            'payment_status' => $validated['payment_method'] === 'maya' ? 'awaiting_payment' : 'unpaid',
-        ]);
-
-        return response()->json([
-            'message' => 'Appointment booked.',
-            'reference_code' => $appointment->reference_code,
-            'appointment' => $appointment
-        ], 201);
+    // booking window check (tomorrow .. +7)
+    $today = now()->startOfDay();
+    if ($date->lte($today) || $date->gt($today->copy()->addDays(7))) {
+        return response()->json(['message' => 'Date is outside the booking window.'], 422);
     }
+
+    // resolve day snapshot
+    $snap = $resolver->resolve($date);
+    if (!$snap['is_open']) {
+        return response()->json(['message' => 'Clinic is closed on this date.'], 422);
+    }
+
+    $open = Carbon::parse($snap['open_time']);
+    $close = Carbon::parse($snap['close_time']);
+    $cap = (int) $snap['effective_capacity'];
+
+    // ensure start is in the 30-min grid and inside hours
+    $grid = ClinicDateResolverService::buildBlocks($snap['open_time'], $snap['close_time']);
+    if (!in_array($startTime->format('H:i'), $grid, true)) {
+        return response()->json(['message' => 'Invalid start time (not on grid or outside hours).'], 422);
+    }
+
+    $endTime = $startTime->copy()->addMinutes($service->estimated_minutes);
+    if ($startTime->lt($open) || $endTime->gt($close)) {
+        return response()->json(['message' => 'Selected time is outside clinic hours.'], 422);
+    }
+
+    // build usage map (pending+approved)
+    $slotUsage = array_fill_keys($grid, 0);
+    $appointments = Appointment::whereDate('date', $dateStr)
+        ->whereIn('status', ['pending', 'approved'])
+        ->get(['time_slot']);
+
+    foreach ($appointments as $appt) {
+        if (!$appt->time_slot || strpos($appt->time_slot, '-') === false) continue;
+
+        [$aStart, $aEnd] = explode('-', $appt->time_slot, 2);
+        $aStart = $this->normalizeTime(trim($aStart));
+        $aEnd   = $this->normalizeTime(trim($aEnd));
+
+        $cur = Carbon::createFromFormat('H:i', $aStart);
+        $end = Carbon::createFromFormat('H:i', $aEnd);
+
+        while ($cur->lt($end)) {
+            $k = $cur->format('H:i');
+            if (isset($slotUsage[$k])) $slotUsage[$k] += 1;
+            $cur->addMinutes(30);
+        }
+    }
+
+    // per-block capacity check
+    $cursor = $startTime->copy();
+    for ($i = 0; $i < $blocksNeeded; $i++) {
+        $k = $cursor->format('H:i');
+        if (!array_key_exists($k, $slotUsage) || $slotUsage[$k] >= $cap) {
+            return response()->json(['message' => "Time slot starting at {$k} is already full."], 422);
+        }
+        $cursor->addMinutes(30);
+    }
+
+    // resolve booking patient by the authenticated user
+    $patient = Patient::byUser(auth()->id());
+    if (!$patient) {
+        return response()->json([
+            'message' => 'Your account is not yet linked to a patient record. Please contact the clinic.',
+        ], 422);
+    }
+
+    // HMO consistency checks
+    $patientHmoId = $request->input('patient_hmo_id'); // may be null
+
+    if ($validated['payment_method'] === 'hmo') {
+        if (!$patientHmoId) {
+            return response()->json(['message' => 'Please select an HMO for this appointment.'], 422);
+        }
+        // must belong to this patient
+        $hmo = \DB::table('patient_hmos')->where('id', $patientHmoId)->first();
+        if (!$hmo || (int)$hmo->patient_id !== (int)$patient->id) {
+            return response()->json(['message' => 'Selected HMO does not belong to this patient.'], 422);
+        }
+        // effective on the appointment date
+        if ($hmo->effective_date && $hmo->effective_date > $dateStr) {
+            return response()->json(['message' => 'Selected HMO is not yet effective on the appointment date.'], 422);
+        }
+        if ($hmo->expiry_date && $hmo->expiry_date < $dateStr) {
+            return response()->json(['message' => 'Selected HMO is expired on the appointment date.'], 422);
+        }
+    } else {
+        // if not HMO, ignore any stray patient_hmo_id
+        $patientHmoId = null;
+    }
+
+    // create appointment
+    $timeSlot = $this->normalizeTime($startTime) . '-' . $this->normalizeTime($endTime);
+    $referenceCode = strtoupper(Str::random(8));
+
+    $appointment = Appointment::create([
+        'patient_id'      => $patient->id,
+        'service_id'      => $service->id,
+        'patient_hmo_id'  => $patientHmoId, // NEW
+        'date'            => $dateStr,
+        'time_slot'       => $timeSlot,
+        'reference_code'  => $referenceCode,
+        'status'          => 'pending',
+        'payment_method'  => $validated['payment_method'],
+        'payment_status'  => $validated['payment_method'] === 'maya' ? 'awaiting_payment' : 'unpaid',
+    ]);
+
+    // (Optional) appointment log for audit
+    // DB::table('appointment_logs')->insert([...]);
+
+    return response()->json([
+        'message'        => 'Appointment booked.',
+        'reference_code' => $appointment->reference_code,
+        'appointment'    => $appointment
+    ], 201);
+}
+
 
 
 

@@ -11,8 +11,9 @@ use App\Http\Middleware\EnsureDeviceIsApproved;
 use App\Http\Controllers\DeviceStatusController;
 
 use App\Http\Controllers\API\InventoryController;
-use App\Http\Controllers\API\AppointmentController;
+use App\Http\Controllers\API\PatientHmoController;
 
+use App\Http\Controllers\API\AppointmentController;
 use App\Http\Controllers\API\NotificationController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\API\InventoryItemController;
@@ -20,8 +21,8 @@ use App\Http\Controllers\Admin\StaffAccountController;
 use App\Http\Controllers\API\ClinicCalendarController;
 use App\Http\Controllers\Staff\PatientVisitController;
 use App\Http\Controllers\API\AppointmentSlotController;
-use App\Http\Controllers\API\DentistScheduleController;
 
+use App\Http\Controllers\API\DentistScheduleController;
 use App\Http\Controllers\API\ServiceDiscountController;
 use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Admin\DeviceApprovalController;
@@ -145,6 +146,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/resolve/{code}', [AppointmentController::class, 'resolveReferenceCode']);
     });
 
+    Route::get('/patients', [PatientController::class, 'index']);
+
     // Patient linking
     Route::post('/patients/link-self', [PatientController::class, 'linkSelf']);
 
@@ -179,6 +182,12 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // If you prefer status behind auth, keep it here instead of public:
     Route::get('/maya/payments/{paymentId}/status', [MayaController::class, 'status']);
+
+    // HMO
+    Route::get('/patients/{patient}/hmos',             [PatientHmoController::class, 'index'])->name('hmos.index');
+    Route::post('/patients/{patient}/hmos',            [PatientHmoController::class, 'store'])->name('hmos.store');
+    Route::put('/patients/{patient}/hmos/{hmo}',       [PatientHmoController::class, 'update'])->name('hmos.update');
+    Route::delete('/patients/{patient}/hmos/{hmo}',    [PatientHmoController::class, 'destroy'])->name('hmos.destroy');
 });
 
 // ------------------------
@@ -186,7 +195,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // ------------------------
 Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(function () {
     // Patients
-    Route::get('/patients', [PatientController::class, 'index']);
+    
     Route::post('/patients', [PatientController::class, 'store']);
     Route::post('/patients/{patient}/link', [PatientController::class, 'linkToUser']);
     Route::post('/patients/{id}/flag', [PatientController::class, 'flagReview']);

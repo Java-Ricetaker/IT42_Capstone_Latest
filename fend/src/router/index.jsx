@@ -67,7 +67,7 @@ export default function AppRouter() {
       <AuthRedirector /> {/* Redirects based on auth state */}
       <Routes>
         {/* Public / Auth Routes */}
-        <Route path="/" element={<LandingPage />} />
+        <Route path="/app" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />

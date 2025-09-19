@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
+import HmoCard from "../../components/HmoCard"; // ⬅️ add this import (adjust path if needed)
 
 const PatientProfile = () => {
   const [user, setUser] = useState(null);
@@ -10,6 +11,7 @@ const PatientProfile = () => {
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
+
   const fetchUser = async () => {
     try {
       const res = await api.get("/api/user");
@@ -60,10 +62,13 @@ const PatientProfile = () => {
   };
 
   if (!user) return <p>Loading your profile...</p>;
+
   const isLinked = !!user.patient && user.patient.is_linked;
+  const role = user.role; // 'admin' | 'staff' | 'patient'
+  const patientId = user.patient?.id; // will exist after linking
 
   return (
-    <div className="container mt-4" style={{ maxWidth: "600px" }}>
+    <div className="container mt-4" style={{ maxWidth: "900px" }}>
       <h2 className="mb-4">My Account</h2>
 
       <div className="mb-4 p-3 border rounded bg-light">
@@ -83,14 +88,14 @@ const PatientProfile = () => {
       </button>
 
       {!isLinked && (
-        <div className="border rounded p-3 bg-warning-subtle">
-          <p>
+        <div className="border rounded p-3 bg-warning-subtle mb-4">
+          <p className="mb-1">
             <strong>You're not yet linked to a patient profile.</strong>
           </p>
           <p>Have you visited the clinic before?</p>
 
-          <div className="mb-3">
-            <div className="alert alert-secondary d-inline-block me-3 p-2">
+          <div className="mb-3 d-flex align-items-center">
+            <div className="alert alert-secondary d-inline-block me-3 p-2 mb-0">
               ✅ Yes – Please visit the clinic for assistance
             </div>
             <button
@@ -131,6 +136,25 @@ const PatientProfile = () => {
           {message && <div className="mt-3 fw-bold">{message}</div>}
         </div>
       )}
+
+      {/* ========================= HMO SECTION ========================= */}
+      {isLinked && patientId && (
+        <div className="mb-4">
+          <h3 className="h5 mb-2">Health Maintenance Organization (HMO)</h3>
+          {/* HmoCard uses Tailwind classes internally; it can live inside Bootstrap containers just fine. */}
+          <HmoCard
+            patientId={patientId}
+            currentUserRole={role}                 // 'patient' here
+            currentUserPatientId={patientId}       // so it knows this user is managing self
+            compact={false}
+            onChange={(items) => {
+              // optional: toast or side-effects after CRUD
+              // console.log("HMO updated:", items);
+            }}
+          />
+        </div>
+      )}
+      {/* =============================================================== */}
     </div>
   );
 };

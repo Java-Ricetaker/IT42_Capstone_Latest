@@ -2,6 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { useState, useEffect } from "react";
 import api from "../../api/api";
 import LoadingSpinner from "../../components/LoadingSpinner";
+import HmoPicker from "../../components/HmoPicker";
 
 function BookAppointment() {
   const navigate = useNavigate();
@@ -17,17 +18,56 @@ function BookAppointment() {
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [bookingMessage, setBookingMessage] = useState("");
 
+  // NEW: for HMO picker
+  const [myPatientId, setMyPatientId] = useState(null);
+  const [patientHmoId, setPatientHmoId] = useState(null);
+  const [loadingPatientId, setLoadingPatientId] = useState(false);
+
+  // try to get the logged-in patient's id
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      setLoadingPatientId(true);
+      try {
+        // Try a couple of common "me" endpoints, ignore errors
+        const tryEndpoints = [
+          "/api/patients/me",
+          "/api/patient/me",
+          "/api/me/patient",
+        ];
+        for (const url of tryEndpoints) {
+          try {
+            const { data } = await api.get(url);
+            const pid =
+              data?.id ??
+              data?.patient_id ??
+              data?.patient?.id ??
+              data?.user?.patient?.id ??
+              null;
+            if (pid && mounted) {
+              setMyPatientId(Number(pid));
+              break;
+            }
+          } catch (_) {
+            // continue to next endpoint
+          }
+        }
+      } finally {
+        if (mounted) setLoadingPatientId(false);
+      }
+    })();
+    return () => (mounted = false);
+  }, []);
+
   const fetchServices = async (date) => {
     setLoading(true);
     setError("");
     try {
-      const res = await api.get(
-        `/api/appointment/available-services?date=${date}`
-      );
+      const res = await api.get(`/api/appointment/available-services?date=${date}`);
       setServices(res.data);
     } catch (err) {
       setServices([]);
-      setError(err.response?.data?.message || "Something went wrong.");
+      setError(err?.response?.data?.message || "Something went wrong.");
     } finally {
       setLoading(false);
     }
@@ -53,6 +93,7 @@ function BookAppointment() {
     setAvailableSlots([]);
     setSelectedSlot("");
     setPaymentMethod("cash");
+    setPatientHmoId(null); // reset HMO when date changes
     setBookingMessage("");
     if (date) fetchServices(date);
   };
@@ -64,26 +105,44 @@ function BookAppointment() {
     setBookingMessage("");
   };
 
+  const handlePaymentChange = (e) => {
+    const v = e.target.value;
+    setPaymentMethod(v);
+    if (v !== "hmo") {
+      setPatientHmoId(null); // clear selection when leaving HMO
+    }
+  };
+
   const handleBookingSubmit = async () => {
     if (!selectedDate || !selectedService || !selectedSlot || !paymentMethod) {
       setBookingMessage("Please complete all booking fields.");
       return;
     }
 
+    if (paymentMethod === "hmo" && !patientHmoId) {
+      setBookingMessage("Please select an HMO for this appointment.");
+      return;
+    }
+
     try {
-      const res = await api.post("/api/appointment", {
+      const payload = {
         service_id: selectedService.id,
         date: selectedDate,
         start_time: selectedSlot,
         payment_method: paymentMethod,
-      });
+      };
+      if (paymentMethod === "hmo") {
+        payload.patient_hmo_id = patientHmoId;
+      }
+
+      await api.post("/api/appointment", payload);
 
       setBookingMessage("✅ Appointment successfully booked! Redirecting...");
       setTimeout(() => {
         navigate("/patient");
-      }, 2000); // ⏱ wait 2 seconds to show message then redirect
+      }, 2000);
     } catch (err) {
-      setBookingMessage(err.response?.data?.message || "Booking failed.");
+      setBookingMessage(err?.response?.data?.message || "Booking failed.");
     }
   };
 
@@ -121,9 +180,7 @@ function BookAppointment() {
                         ₱{s.original_price}
                       </span>{" "}
                       <span className="text-success">₱{s.promo_price}</span>{" "}
-                      <span className="text-danger">
-                        ({s.discount_percent}% off)
-                      </span>
+                      <span className="text-danger">({s.discount_percent}% off)</span>
                     </div>
                   )}
                   {s.type === "special" && (
@@ -138,10 +195,7 @@ function BookAppointment() {
                     </div>
                   )}
                 </div>
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => handleServiceSelect(s)}
-                >
+                <button className="btn btn-primary btn-sm" onClick={() => handleServiceSelect(s)}>
                   Select
                 </button>
               </li>
@@ -154,9 +208,8 @@ function BookAppointment() {
         <div className="mt-4">
           <h5>🕑 Select a Time Slot for {selectedService.name}</h5>
 
-          {availableSlots.length === 0 && (
-            <p className="text-muted">No available slots.</p>
-          )}
+          {availableSlots.length === 0 && <p className="text-muted">No available slots.</p>}
+
           <select
             className="form-select"
             value={selectedSlot}
@@ -172,26 +225,39 @@ function BookAppointment() {
 
           <div className="mt-3">
             <label className="form-label">Payment Method:</label>
-            <select
-              className="form-select"
-              value={paymentMethod}
-              onChange={(e) => setPaymentMethod(e.target.value)}
-            >
+            <select className="form-select" value={paymentMethod} onChange={handlePaymentChange}>
               <option value="cash">Cash (on-site)</option>
               <option value="maya">Maya</option>
               <option value="hmo">HMO</option>
             </select>
           </div>
 
-          <button
-            className="btn btn-success mt-3"
-            onClick={handleBookingSubmit}
-          >
+          {paymentMethod === "hmo" && (
+            <div className="mt-3">
+              <label className="form-label">Choose HMO:</label>
+              {loadingPatientId ? (
+                <div className="text-muted">Loading HMO list…</div>
+              ) : myPatientId ? (
+                <HmoPicker
+                  patientId={myPatientId}
+                  appointmentDate={selectedDate}
+                  value={patientHmoId}
+                  onChange={setPatientHmoId}
+                  required
+                />
+              ) : (
+                <div className="alert alert-warning">
+                  We couldn’t load your patient profile. You may need to link your account at the
+                  clinic, or try again later.
+                </div>
+              )}
+            </div>
+          )}
+
+          <button className="btn btn-success mt-3" onClick={handleBookingSubmit}>
             Confirm Appointment
           </button>
-          {bookingMessage && (
-            <div className="alert alert-info mt-3">{bookingMessage}</div>
-          )}
+          {bookingMessage && <div className="alert alert-info mt-3">{bookingMessage}</div>}
         </div>
       )}
     </div>

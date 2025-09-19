@@ -16,9 +16,7 @@ Route::get('/', function () {
     return ['Laravel' => app()->version()];
 });
 
-Route::get('/sanctum/csrf-cookie', function () {
-    return response()->noContent();
-});
+
 
 Route::post('/login', [AuthenticatedSessionController::class, 'store']);
 
