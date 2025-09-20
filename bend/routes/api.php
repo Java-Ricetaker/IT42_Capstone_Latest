@@ -31,6 +31,7 @@ use App\Http\Controllers\API\AppointmentServiceController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\API\ClinicWeeklyScheduleController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
+use App\Http\Controllers\Admin\SystemLogController;
 
 // ------------------------
 // Public auth routes
@@ -122,6 +123,14 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
     //inventory
     Route::post('/inventory/adjust', [InventoryController::class, 'adjust']);
     Route::patch('/inventory/settings', [InventorySettingsController::class, 'update']);
+
+    // System logs
+    Route::prefix('system-logs')->group(function () {
+        Route::get('/', [SystemLogController::class, 'index']);
+        Route::get('/filter-options', [SystemLogController::class, 'filterOptions']);
+        Route::get('/statistics', [SystemLogController::class, 'statistics']);
+        Route::get('/{systemLog}', [SystemLogController::class, 'show']);
+    });
 });
 
 // ------------------------
@@ -210,9 +219,11 @@ Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(functi
         Route::get('/', [PatientVisitController::class, 'index']);
         Route::post('/', [PatientVisitController::class, 'store']);
         Route::post('/{id}/finish', [PatientVisitController::class, 'finish']);
+        Route::post('/{id}/complete-with-details', [PatientVisitController::class, 'completeWithDetails']);
         Route::post('/{id}/reject', [PatientVisitController::class, 'reject']);
         Route::put('/{id}/update-patient', [PatientVisitController::class, 'updatePatient']);
         Route::post('/{visit}/link-existing', [PatientVisitController::class, 'linkToExistingPatient']);
+        Route::post('/{id}/view-notes', [PatientVisitController::class, 'viewNotes']);
     });
 
     // Appointments (staff side)

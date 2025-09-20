@@ -6,7 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\PatientVisit;
 use Illuminate\Http\Request;
 use App\Models\Patient;
+use App\Models\SystemLog;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 
 class PatientVisitController extends Controller
@@ -132,6 +135,109 @@ class PatientVisitController extends Controller
         return response()->json(['message' => 'Visit completed.']);
     }
 
+    /**
+     * POST /api/visits/{id}/complete-with-details
+     * Complete visit with stock consumption, encrypted notes, and payment verification
+     */
+    public function completeWithDetails(Request $request, $id)
+    {
+        $visit = PatientVisit::with(['patient', 'service', 'payments'])->findOrFail($id);
+
+        if ($visit->status !== 'pending') {
+            return response()->json(['message' => 'Only pending visits can be completed.'], 422);
+        }
+
+        $validated = $request->validate([
+            'stock_items' => ['required', 'array'],
+            'stock_items.*.item_id' => ['required', 'exists:inventory_items,id'],
+            'stock_items.*.quantity' => ['required', 'numeric', 'min:0.001'],
+            'stock_items.*.notes' => ['nullable', 'string'],
+            'dentist_notes' => ['nullable', 'string', 'max:2000'],
+            'findings' => ['nullable', 'string', 'max:2000'],
+            'treatment_plan' => ['nullable', 'string', 'max:2000'],
+            'payment_status' => ['required', 'in:paid,hmo_fully_covered,partial,unpaid'],
+            'onsite_payment_amount' => ['nullable', 'numeric', 'min:0'],
+            'payment_method_change' => ['nullable', 'in:maya_to_cash'],
+        ]);
+
+        $userId = $request->user()->id;
+        return DB::transaction(function () use ($visit, $validated, $userId) {
+            // 1. Consume stock items
+            foreach ($validated['stock_items'] as $item) {
+                \App\Models\InventoryMovement::create([
+                    'item_id' => $item['item_id'],
+                    'type' => 'consume',
+                    'quantity' => $item['quantity'],
+                    'ref_type' => 'visit',
+                    'ref_id' => $visit->id,
+                    'user_id' => $userId,
+                    'notes' => $item['notes'] ?? null,
+                ]);
+            }
+
+            // 2. Update visit with encrypted notes
+            $visit->update([
+                'end_time' => now(),
+                'status' => 'completed',
+                'note' => json_encode([
+                    'dentist_notes' => $validated['dentist_notes'] ?? null,
+                    'findings' => $validated['findings'] ?? null,
+                    'treatment_plan' => $validated['treatment_plan'] ?? null,
+                    'completed_by' => $userId,
+                    'completed_at' => now(),
+                ]),
+            ]);
+
+            // 3. Handle payment verification/adjustment
+            $totalPaid = $visit->payments->sum('amount_paid');
+            $servicePrice = $visit->service?->price ?? 0;
+
+            if ($validated['payment_status'] === 'paid' && $totalPaid >= $servicePrice) {
+                // Already fully paid, no action needed
+            } elseif ($validated['payment_status'] === 'hmo_fully_covered') {
+                // HMO fully covered - create HMO payment record
+                \App\Models\Payment::create([
+                    'patient_visit_id' => $visit->id,
+                    'amount_due' => $servicePrice,
+                    'amount_paid' => $servicePrice,
+                    'method' => 'hmo',
+                    'status' => 'paid',
+                    'reference_no' => 'HMO-' . $visit->id . '-' . time(),
+                    'created_by' => $userId,
+                    'paid_at' => now(),
+                ]);
+            } elseif ($validated['payment_status'] === 'partial' && isset($validated['onsite_payment_amount'])) {
+                // Add on-site payment
+                \App\Models\Payment::create([
+                    'patient_visit_id' => $visit->id,
+                    'amount_due' => $validated['onsite_payment_amount'],
+                    'amount_paid' => $validated['onsite_payment_amount'],
+                    'method' => 'cash',
+                    'status' => 'paid',
+                    'reference_no' => 'CASH-' . $visit->id . '-' . time(),
+                    'created_by' => $userId,
+                    'paid_at' => now(),
+                ]);
+            } elseif ($validated['payment_status'] === 'unpaid' && isset($validated['payment_method_change'])) {
+                // Change Maya to cash payment
+                $mayaPayment = $visit->payments->where('method', 'maya')->first();
+                if ($mayaPayment) {
+                    $mayaPayment->update([
+                        'method' => 'cash',
+                        'status' => 'paid',
+                        'amount_paid' => $mayaPayment->amount_due,
+                        'paid_at' => now(),
+                    ]);
+                }
+            }
+
+            return response()->json([
+                'message' => 'Visit completed successfully',
+                'visit' => $visit->fresh(['patient', 'service', 'payments']),
+            ]);
+        });
+    }
+
     // 🔴 Reject visit
     public function reject($id, Request $request)
     {
@@ -192,6 +298,93 @@ class PatientVisitController extends Controller
             'message' => 'Visit successfully linked to existing patient profile.',
             'visit' => $visit->load('patient'),
         ]);
+    }
+
+    /**
+     * POST /api/visits/{id}/view-notes
+     * View encrypted visit notes with current user's password verification
+     */
+    public function viewNotes(Request $request, $id)
+    {
+        $visit = PatientVisit::findOrFail($id);
+        $user = $request->user();
+
+        if ($visit->status !== 'completed' || !$visit->note) {
+            return response()->json(['message' => 'No encrypted notes available for this visit.'], 404);
+        }
+
+        $validated = $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        // Verify the current user's password
+        if (!Hash::check($validated['password'], $user->password)) {
+            // Log failed access attempt
+            SystemLog::create([
+                'user_id' => $user->id,
+                'category' => 'visit_notes',
+                'action' => 'access_denied',
+                'subject_id' => $visit->id,
+                'message' => 'Failed to access visit notes - invalid password',
+                'context' => [
+                    'visit_id' => $visit->id,
+                    'patient_name' => $visit->patient ? $visit->patient->first_name . ' ' . $visit->patient->last_name : 'Unknown',
+                    'attempted_at' => now()->toISOString(),
+                ],
+            ]);
+
+            return response()->json(['message' => 'Invalid password.'], 401);
+        }
+
+        try {
+            // Decrypt the notes (they're stored as JSON)
+            $notes = json_decode($visit->note, true);
+            
+            if (!$notes) {
+                return response()->json(['message' => 'Failed to decrypt notes.'], 500);
+            }
+
+            // Log successful access
+            SystemLog::create([
+                'user_id' => $user->id,
+                'category' => 'visit_notes',
+                'action' => 'viewed',
+                'subject_id' => $visit->id,
+                'message' => 'Successfully accessed visit notes',
+                'context' => [
+                    'visit_id' => $visit->id,
+                    'patient_name' => $visit->patient ? $visit->patient->first_name . ' ' . $visit->patient->last_name : 'Unknown',
+                    'accessed_at' => now()->toISOString(),
+                    'notes_contained' => [
+                        'dentist_notes' => !empty($notes['dentist_notes']),
+                        'findings' => !empty($notes['findings']),
+                        'treatment_plan' => !empty($notes['treatment_plan']),
+                    ],
+                ],
+            ]);
+
+            return response()->json([
+                'message' => 'Notes decrypted successfully.',
+                'notes' => $notes,
+            ]);
+        } catch (\Exception $e) {
+            // Log decryption failure
+            SystemLog::create([
+                'user_id' => $user->id,
+                'category' => 'visit_notes',
+                'action' => 'decryption_failed',
+                'subject_id' => $visit->id,
+                'message' => 'Failed to decrypt visit notes',
+                'context' => [
+                    'visit_id' => $visit->id,
+                    'patient_name' => $visit->patient ? $visit->patient->first_name . ' ' . $visit->patient->last_name : 'Unknown',
+                    'error' => $e->getMessage(),
+                    'attempted_at' => now()->toISOString(),
+                ],
+            ]);
+
+            return response()->json(['message' => 'Failed to decrypt notes.'], 500);
+        }
     }
 
 }

@@ -6,6 +6,7 @@ use Illuminate\Support\Str;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
+use App\Services\SystemLogService;
 
 
 class DeviceApprovalController extends Controller
@@ -47,6 +48,14 @@ class DeviceApprovalController extends Controller
                 'updated_at' => now(),
             ]);
 
+        // Log the device approval
+        SystemLogService::logDevice(
+            'approved',
+            $request->device_id,
+            "Device approved with name: {$request->device_name}",
+            ['device_name' => $request->device_name]
+        );
+
         return response()->json(['message' => 'Device approved successfully.']);
     }
 
@@ -58,6 +67,13 @@ class DeviceApprovalController extends Controller
         ]);
 
         DB::table('staff_device')->where('id', $request->device_id)->delete();
+
+        // Log the device rejection
+        SystemLogService::logDevice(
+            'rejected',
+            $request->device_id,
+            "Device rejected and removed from system"
+        );
 
         return response()->json(['message' => 'Device rejected and removed.']);
     }

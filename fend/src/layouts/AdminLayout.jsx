@@ -152,6 +152,18 @@ function AdminLayout() {
             </NavLink>
           </li>
 
+          {/* --- System Logs --- */}
+          <li className="nav-item">
+            <NavLink
+              to="/admin/system-logs"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
+              📊 System Logs
+            </NavLink>
+          </li>
+
           <li className="nav-item">
             <NavLink
               to="/admin/profile"

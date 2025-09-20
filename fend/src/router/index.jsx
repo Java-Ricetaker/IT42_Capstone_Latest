@@ -32,6 +32,7 @@ import ServiceDiscountManager from "../pages/Admin/ServiceDiscountManager";
 import PromoArchive from "../pages/Admin/PromoArchive";
 import ScheduleManager from "../pages/Admin/ScheduleManager";
 import ClinicCalendarManager from "../pages/Admin/ClinicCalendarManager";
+import SystemLogsPage from "../pages/Admin/SystemLogsPage";
 const DentistScheduleManager = lazy(() =>
   import("../pages/Admin/DentistScheduleManager")
 ); // Lazy load dentist schedule manager
@@ -110,6 +111,8 @@ export default function AppRouter() {
           />
           {/* Mirror Staff Appointments under Admin */}
           <Route path="appointments" element={<StaffAppointmentManager />} />
+          {/* System Logs */}
+          <Route path="system-logs" element={<SystemLogsPage />} />
           {/* Add more admin routes as needed */}
         </Route>
 

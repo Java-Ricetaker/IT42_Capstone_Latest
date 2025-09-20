@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import api from "../../api/api";
 import LoadingSpinner from "../LoadingSpinner";
+import VisitCompletionModal from "./VisitCompletionModal";
+import VisitNotesModal from "./VisitNotesModal";
 
 function VisitTrackerManager() {
   const [visits, setVisits] = useState([]);
@@ -28,6 +30,8 @@ function VisitTrackerManager() {
   const [matchingPatients, setMatchingPatients] = useState([]);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [showAllVisits, setShowAllVisits] = useState(false);
+  const [completingVisit, setCompletingVisit] = useState(null);
+  const [viewingNotes, setViewingNotes] = useState(null);
 
   useEffect(() => {
     fetchVisits();
@@ -76,12 +80,22 @@ function VisitTrackerManager() {
   };
 
   const handleAction = async (id, action) => {
+    if (action === "finish") {
+      const visit = visits.find(v => v.id === id);
+      setCompletingVisit(visit);
+      return;
+    }
+    
     try {
       await api.post(`/api/visits/${id}/${action}`);
       await fetchVisits();
     } catch (err) {
       alert(`Failed to ${action} visit.`);
     }
+  };
+
+  const handleVisitComplete = async () => {
+    await fetchVisits();
   };
 
   const handleSearchRefCode = async () => {
@@ -237,7 +251,18 @@ function VisitTrackerManager() {
                       {v.patient?.first_name} {v.patient?.last_name}
                     </td>
                     <td>{v.patient?.contact_number || "—"}</td>
-                    <td>{v.note || "—"}</td>
+                    <td>
+                      {v.status === "completed" && v.note ? (
+                        <button
+                          className="btn btn-sm btn-outline-info"
+                          onClick={() => setViewingNotes(v)}
+                        >
+                          🔒 View Notes
+                        </button>
+                      ) : (
+                        v.note || "—"
+                      )}
+                    </td>
                     <td>
                       {v.start_time
                         ? new Date(v.start_time).toLocaleString("en-PH", {
@@ -571,6 +596,23 @@ function VisitTrackerManager() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Visit Completion Modal */}
+      {completingVisit && (
+        <VisitCompletionModal
+          visit={completingVisit}
+          onClose={() => setCompletingVisit(null)}
+          onComplete={handleVisitComplete}
+        />
+      )}
+
+      {/* Visit Notes Modal */}
+      {viewingNotes && (
+        <VisitNotesModal
+          visit={viewingNotes}
+          onClose={() => setViewingNotes(null)}
+        />
       )}
     </div>
   );

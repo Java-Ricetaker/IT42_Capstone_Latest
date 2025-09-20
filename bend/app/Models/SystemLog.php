@@ -13,7 +13,7 @@ class SystemLog extends Model
         'user_id',
         'category',
         'action',
-        'subject_id',   // ← add this
+        'subject_id',   
         'message',
         'context',
     ];
