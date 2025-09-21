@@ -60,7 +60,6 @@ export function NotificationsProvider({ children }) {
     const interval = setInterval(() => {
       loadUnread(); // Check for new notifications
     }, 120000); // 2 minutes (120 seconds)
-
     // Cleanup interval on unmount
     return () => clearInterval(interval);
   }, [loadUnread]);
