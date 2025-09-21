@@ -2,12 +2,15 @@ import { Outlet, useNavigate, NavLink } from "react-router-dom";
 import { useEffect, useState } from "react";
 import api from "../api/api";
 import NotificationsBell from "../components/NotificationBell"; // <-- adjust path if needed
+import { getFingerprint } from "../utils/getFingerprint";
 import "./StaffLayout.css";
 
 function StaffLayout() {
   const navigate = useNavigate();
   const [allowInventory, setAllowInventory] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [deviceStatus, setDeviceStatus] = useState(null);
+  const [deviceLoaded, setDeviceLoaded] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -19,6 +22,29 @@ function StaffLayout() {
         // if it fails, just hide the link
       } finally {
         if (mounted) setLoaded(true);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // Check device approval status
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const fingerprint = await getFingerprint();
+        api.defaults.headers.common["X-Device-Fingerprint"] = fingerprint;
+        const res = await api.get("/api/device-status", {
+          headers: {
+            "X-Device-Fingerprint": fingerprint,
+          },
+        });
+        if (mounted) setDeviceStatus(res.data);
+      } catch (err) {
+        console.error("Device check failed", err);
+        if (mounted) setDeviceStatus({ approved: false });
+      } finally {
+        if (mounted) setDeviceLoaded(true);
       }
     })();
     return () => { mounted = false; };
@@ -67,7 +93,20 @@ function StaffLayout() {
           <li className="nav-item">
             <NavLink
               to="/staff/appointments"
-              className={({ isActive }) => "nav-link" + (isActive ? " fw-bold text-primary" : "")}
+              className={({ isActive }) => {
+                const baseClass = "nav-link" + (isActive ? " fw-bold text-primary" : "");
+                const isDisabled = deviceLoaded && deviceStatus && !deviceStatus.approved;
+                return baseClass + (isDisabled ? " disabled text-muted" : "");
+              }}
+              onClick={(e) => {
+                if (deviceLoaded && deviceStatus && !deviceStatus.approved) {
+                  e.preventDefault();
+                }
+              }}
+              style={{
+                cursor: deviceLoaded && deviceStatus && !deviceStatus.approved ? "not-allowed" : "pointer",
+                opacity: deviceLoaded && deviceStatus && !deviceStatus.approved ? 0.5 : 1
+              }}
             >
               📅 Appointments
             </NavLink>
@@ -76,7 +115,20 @@ function StaffLayout() {
           <li className="nav-item">
             <NavLink
               to="/staff/appointment-reminders"
-              className={({ isActive }) => "nav-link" + (isActive ? " fw-bold text-primary" : "")}
+              className={({ isActive }) => {
+                const baseClass = "nav-link" + (isActive ? " fw-bold text-primary" : "");
+                const isDisabled = deviceLoaded && deviceStatus && !deviceStatus.approved;
+                return baseClass + (isDisabled ? " disabled text-muted" : "");
+              }}
+              onClick={(e) => {
+                if (deviceLoaded && deviceStatus && !deviceStatus.approved) {
+                  e.preventDefault();
+                }
+              }}
+              style={{
+                cursor: deviceLoaded && deviceStatus && !deviceStatus.approved ? "not-allowed" : "pointer",
+                opacity: deviceLoaded && deviceStatus && !deviceStatus.approved ? 0.5 : 1
+              }}
             >
               🔔 Reminders
             </NavLink>
@@ -87,7 +139,20 @@ function StaffLayout() {
             <li className="nav-item">
               <NavLink
                 to="/staff/inventory"
-                className={({ isActive }) => "nav-link" + (isActive ? " fw-bold text-primary" : "")}
+                className={({ isActive }) => {
+                  const baseClass = "nav-link" + (isActive ? " fw-bold text-primary" : "");
+                  const isDisabled = deviceLoaded && deviceStatus && !deviceStatus.approved;
+                  return baseClass + (isDisabled ? " disabled text-muted" : "");
+                }}
+                onClick={(e) => {
+                  if (deviceLoaded && deviceStatus && !deviceStatus.approved) {
+                    e.preventDefault();
+                  }
+                }}
+                style={{
+                  cursor: deviceLoaded && deviceStatus && !deviceStatus.approved ? "not-allowed" : "pointer",
+                  opacity: deviceLoaded && deviceStatus && !deviceStatus.approved ? 0.5 : 1
+                }}
               >
                 📦 Inventory
               </NavLink>

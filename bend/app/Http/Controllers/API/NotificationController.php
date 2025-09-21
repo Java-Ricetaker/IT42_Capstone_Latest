@@ -179,7 +179,7 @@ class NotificationController extends Controller
         $perPage = max(5, min((int) $req->query('perPage', 20), 100));
         $page = max(1, (int) $req->query('page', 1));
 
-        $q = \DB::table('notifications as n')
+        $q = DB::table('notifications as n')
             ->join('notification_targets as t', 't.notification_id', '=', 'n.id')
             ->where('t.user_id', $u->id)
             ->whereNotNull('t.seen_at') // show only items this account has actually seen

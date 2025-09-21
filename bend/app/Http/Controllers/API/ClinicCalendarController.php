@@ -389,7 +389,7 @@ class ClinicCalendarController extends Controller
         $today = Carbon::today();
         $until = $today->copy()->addDays($days);
 
-        $rows = \DB::table('appointments as a')
+        $rows = DB::table('appointments as a')
             ->join('patients as p', 'p.id', '=', 'a.patient_id')             // join via patient
             ->join('clinic_calendar as c', 'c.date', '=', 'a.date')
             ->where('p.user_id', $user->id)                                  // filter by signed-in user
@@ -403,7 +403,7 @@ class ClinicCalendarController extends Controller
                 'a.time_slot',
                 'a.service_id',
                 'a.status',
-                \DB::raw('c.note as closure_message'),
+                DB::raw('c.note as closure_message'),
             ]);
 
         return response()->json([

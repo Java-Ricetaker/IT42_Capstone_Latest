@@ -2,14 +2,20 @@
 
 namespace App\Http\Controllers\Staff;
 
-use App\Http\Controllers\Controller;
+use App\Models\Patient;
+use App\Models\Payment;
+use App\Models\SystemLog;
+use App\Models\Appointment;
+use Illuminate\Support\Str;
 use App\Models\PatientVisit;
 use Illuminate\Http\Request;
-use App\Models\Patient;
-use App\Models\SystemLog;
-use Illuminate\Support\Str;
+use App\Models\InventoryItem;
+use Illuminate\Support\Carbon;
+use App\Models\InventoryMovement;
 use Illuminate\Support\Facades\DB;
+use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 
 
 class PatientVisitController extends Controller
@@ -55,7 +61,7 @@ class PatientVisitController extends Controller
 
             $code = strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $data['reference_code']));
 
-            $appointment = \App\Models\Appointment::with(['patient', 'service'])
+            $appointment = Appointment::with(['patient', 'service'])
                 ->whereRaw('UPPER(reference_code) = ?', [$code])
                 ->where('status', 'approved')
                 // ->whereDate('date', now()->toDateString()) // re-enable if you want “today only”
@@ -162,17 +168,54 @@ class PatientVisitController extends Controller
 
         $userId = $request->user()->id;
         return DB::transaction(function () use ($visit, $validated, $userId) {
-            // 1. Consume stock items
+            // 1. Consume stock items and update batch quantities
             foreach ($validated['stock_items'] as $item) {
-                \App\Models\InventoryMovement::create([
-                    'item_id' => $item['item_id'],
-                    'type' => 'consume',
-                    'quantity' => $item['quantity'],
-                    'ref_type' => 'visit',
-                    'ref_id' => $visit->id,
-                    'user_id' => $userId,
-                    'notes' => $item['notes'] ?? null,
-                ]);
+                $inventoryItem = InventoryItem::with([
+                    'batches' => function ($q) {
+                        $q->where('qty_on_hand', '>', 0)
+                            ->orderByRaw('CASE WHEN expiry_date IS NULL THEN 1 ELSE 0 END')
+                            ->orderBy('expiry_date', 'asc')
+                            ->orderBy('received_at', 'asc')
+                            ->lockForUpdate();
+                    }
+                ])->findOrFail($item['item_id']);
+
+                $totalOnHand = (float) $inventoryItem->batches->sum('qty_on_hand');
+                if ((float) $item['quantity'] > $totalOnHand) {
+                    throw new \Exception("Insufficient stock for {$inventoryItem->name}. Requested {$item['quantity']} but only {$totalOnHand} available.");
+                }
+
+                $remaining = (float) $item['quantity'];
+                foreach ($inventoryItem->batches as $batch) {
+                    if ($remaining <= 0)
+                        break;
+
+                    $take = min($remaining, (float) $batch->qty_on_hand);
+                    $batch->qty_on_hand = (float) $batch->qty_on_hand - $take;
+                    $batch->save();
+
+                    InventoryMovement::create([
+                        'item_id' => $item['item_id'],
+                        'batch_id' => $batch->id,
+                        'type' => 'consume',
+                        'quantity' => $take,
+                        'ref_type' => 'visit',
+                        'ref_id' => $visit->id,
+                        'user_id' => $userId,
+                        'notes' => $item['notes'] ?? null,
+                    ]);
+
+                    $remaining -= $take;
+                }
+
+                // Check for low stock threshold after consumption
+                $inventoryItem->refresh();
+                if ($inventoryItem->low_stock_threshold > 0) {
+                    $total = (float) $inventoryItem->batches()->sum('qty_on_hand');
+                    if ($total <= (float) $inventoryItem->low_stock_threshold) {
+                        \App\Services\NotificationService::notifyLowStock($inventoryItem, $total);
+                    }
+                }
             }
 
             // 2. Update visit with encrypted notes
@@ -192,11 +235,25 @@ class PatientVisitController extends Controller
             $totalPaid = $visit->payments->sum('amount_paid');
             $servicePrice = $visit->service?->price ?? 0;
 
-            if ($validated['payment_status'] === 'paid' && $totalPaid >= $servicePrice) {
-                // Already fully paid, no action needed
+            if ($validated['payment_status'] === 'paid') {
+                // If already fully paid, no action needed
+                // If not fully paid, create a cash payment to cover the balance
+                if ($totalPaid < $servicePrice) {
+                    $balance = $servicePrice - $totalPaid;
+                    Payment::create([
+                        'patient_visit_id' => $visit->id,
+                        'amount_due' => $balance,
+                        'amount_paid' => $balance,
+                        'method' => 'cash',
+                        'status' => 'paid',
+                        'reference_no' => 'CASH-' . $visit->id . '-' . time(),
+                        'created_by' => $userId,
+                        'paid_at' => now(),
+                    ]);
+                }
             } elseif ($validated['payment_status'] === 'hmo_fully_covered') {
                 // HMO fully covered - create HMO payment record
-                \App\Models\Payment::create([
+                Payment::create([
                     'patient_visit_id' => $visit->id,
                     'amount_due' => $servicePrice,
                     'amount_paid' => $servicePrice,
@@ -208,7 +265,7 @@ class PatientVisitController extends Controller
                 ]);
             } elseif ($validated['payment_status'] === 'partial' && isset($validated['onsite_payment_amount'])) {
                 // Add on-site payment
-                \App\Models\Payment::create([
+                Payment::create([
                     'patient_visit_id' => $visit->id,
                     'amount_due' => $validated['onsite_payment_amount'],
                     'amount_paid' => $validated['onsite_payment_amount'],
@@ -230,6 +287,43 @@ class PatientVisitController extends Controller
                     ]);
                 }
             }
+
+            // 4) Update appointment.payment_status based on the processed visit payment_status
+            // Map visit payment status -> appointment's simple enum
+            $appointmentPaymentStatus = match ($validated['payment_status']) {
+                'paid', 'hmo_fully_covered', 'partial' => 'paid', // any payment -> paid
+                'unpaid' => 'unpaid',
+                default => 'unpaid',
+            };
+
+            // Find and update matching appointments
+            $matchingAppointments = Appointment::where('patient_id', $visit->patient_id)
+                ->where('service_id', $visit->service_id)
+                ->whereDate('date', $visit->visit_date)
+                ->whereIn('status', ['approved', 'completed'])
+                ->get();
+
+            Log::info('Updating appointment payment status', [
+                'visit_id' => $visit->id,
+                'patient_id' => $visit->patient_id,
+                'service_id' => $visit->service_id,
+                'visit_date' => $visit->visit_date,
+                'payment_status' => $validated['payment_status'],
+                'appointment_payment_status' => $appointmentPaymentStatus,
+                'matching_appointments_count' => $matchingAppointments->count()
+            ]);
+
+            foreach ($matchingAppointments as $appointment) {
+                $oldStatus = $appointment->payment_status;
+                $appointment->update(['payment_status' => $appointmentPaymentStatus]);
+                
+                Log::info('Appointment payment status updated', [
+                    'appointment_id' => $appointment->id,
+                    'old_status' => $oldStatus,
+                    'new_status' => $appointmentPaymentStatus
+                ]);
+            }
+
 
             return response()->json([
                 'message' => 'Visit completed successfully',
@@ -339,7 +433,7 @@ class PatientVisitController extends Controller
         try {
             // Decrypt the notes (they're stored as JSON)
             $notes = json_decode($visit->note, true);
-            
+
             if (!$notes) {
                 return response()->json(['message' => 'Failed to decrypt notes.'], 500);
             }

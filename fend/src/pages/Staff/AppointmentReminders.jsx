@@ -29,6 +29,12 @@ function AppointmentReminders() {
   };
 
   const handleOpenModal = (appointment) => {
+    // Additional safety check - only allow reminders for approved appointments
+    if (appointment.status !== 'approved') {
+      alert('Only approved appointments can receive reminders.');
+      return;
+    }
+
     const name = appointment.patient?.user?.name || "Patient";
     const msg = `Hello ${name}, this is a reminder for your dental appointment on ${appointment.date} at ${appointment.time_slot} for ${appointment.service?.name}. Ref: ${appointment.reference_code}. Please arrive on time. – Pitogo's Dental Clinic`;
 
@@ -80,6 +86,7 @@ function AppointmentReminders() {
                 <th>Time Slot</th>
                 <th>Patient</th>
                 <th>Service</th>
+                <th>Status</th>
                 <th>Contact</th>
                 <th>Action</th>
               </tr>
@@ -91,11 +98,16 @@ function AppointmentReminders() {
                   <td>{a.time_slot}</td>
                   <td>{a.patient?.user?.name || "N/A"}</td>
                   <td>{a.service?.name}</td>
+                  <td>
+                    <span className={`badge ${a.status === 'approved' ? 'bg-success' : 'bg-warning'}`}>
+                      {a.status}
+                    </span>
+                  </td>
                   <td>{a.patient?.user?.email || "—"}</td>
                   <td>
                     <button
                       className="btn btn-sm btn-primary"
-                      disabled={sending[a.id]}
+                      disabled={sending[a.id] || a.status !== 'approved'}
                       onClick={() => handleOpenModal(a)}
                     >
                       {sending[a.id] ? "Sending..." : "Send Reminder"}

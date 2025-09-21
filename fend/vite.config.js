@@ -9,8 +9,21 @@ export default defineConfig({
     emptyOutDir: true,
   },
   server: {
-    host: true, // optional; helps when testing
-  },
+    proxy: {
+      '/api': {
+        target: 'http://localhost:8000',
+        changeOrigin: true,
+        secure: false,
+        ws: false,        // important: don't WS proxy to Laravel API
+      }
+    }
+  }
+
+  //0000000000000000
+  // server: {
+  //   host: true, // optional; helps when testing
+  // },
+
   // server: {
   //   host: '127.0.0.1',
   //   port: 5173,

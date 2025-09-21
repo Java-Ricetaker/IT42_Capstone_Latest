@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useMemo, useRef, useState, useEffect } from "react";
 import api from "../api/api";
 
 const Ctx = createContext(null);
@@ -50,6 +50,20 @@ export function NotificationsProvider({ children }) {
       // NOTE: list itself doesn’t change, only read status server-side.
     } catch { /* ignore */ }
   }, []);
+
+  // Auto-refresh notifications every 2 minutes (reasonable for small clinic)
+  useEffect(() => {
+    // Initial load
+    loadUnread();
+
+    // Set up interval for auto-refresh
+    const interval = setInterval(() => {
+      loadUnread(); // Check for new notifications
+    }, 120000); // 2 minutes (120 seconds)
+
+    // Cleanup interval on unmount
+    return () => clearInterval(interval);
+  }, [loadUnread]);
 
   const value = useMemo(() => ({
     items, unread, loading, error,

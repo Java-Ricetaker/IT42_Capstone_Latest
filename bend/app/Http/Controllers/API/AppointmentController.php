@@ -13,6 +13,9 @@ use Illuminate\Validation\Rule;
 use App\Helpers\NotificationService;
 use App\Http\Controllers\Controller;
 use App\Services\ClinicDateResolverService;
+use App\Services\NotificationService as SystemNotificationService;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\DB;
 
 class AppointmentController extends Controller
 {
@@ -112,7 +115,7 @@ class AppointmentController extends Controller
             return response()->json(['message' => 'Please select an HMO for this appointment.'], 422);
         }
         // must belong to this patient
-        $hmo = \DB::table('patient_hmos')->where('id', $patientHmoId)->first();
+        $hmo = DB::table('patient_hmos')->where('id', $patientHmoId)->first();
         if (!$hmo || (int)$hmo->patient_id !== (int)$patient->id) {
             return response()->json(['message' => 'Selected HMO does not belong to this patient.'], 422);
         }
@@ -144,6 +147,9 @@ class AppointmentController extends Controller
         'payment_status'  => $validated['payment_method'] === 'maya' ? 'awaiting_payment' : 'unpaid',
     ]);
 
+    // Notify staff about the new appointment
+    SystemNotificationService::notifyNewAppointment($appointment);
+
     // (Optional) appointment log for audit
     // DB::table('appointment_logs')->insert([...]);
 
@@ -170,6 +176,9 @@ class AppointmentController extends Controller
         $from = $appointment->status;
         $appointment->status = 'approved';
         $appointment->save();
+
+        // Notify patient about appointment approval
+        SystemNotificationService::notifyAppointmentStatusChange($appointment, 'approved');
 
         SystemLog::create([
             'user_id' => auth()->id(),
@@ -199,6 +208,8 @@ class AppointmentController extends Controller
         $appointment->notes = $request->note;
         $appointment->save();
 
+        // Notify patient about appointment rejection
+        SystemNotificationService::notifyAppointmentStatusChange($appointment, 'rejected');
 
         SystemLog::create([
             'user_id' => auth()->id(),
@@ -247,10 +258,26 @@ class AppointmentController extends Controller
             ]);
         }
 
-        $appointments = Appointment::with('service')
+        $appointments = Appointment::with(['service', 'payments'])
             ->where('patient_id', $user->patient->id)
             ->latest('date')
             ->paginate(10);
+
+        // Log the appointments data for debugging
+        Log::info('Patient Appointments API Response', [
+            'patient_id' => $user->patient->id,
+            'appointments_count' => $appointments->count(),
+            'appointments' => $appointments->getCollection()->map(function ($appointment) {
+                return [
+                    'id' => $appointment->id,
+                    'payment_status' => $appointment->payment_status,
+                    'status' => $appointment->status,
+                    'payment_method' => $appointment->payment_method,
+                    'payments_count' => $appointment->payments->count(),
+                    'total_paid' => $appointment->payments->sum('amount_paid')
+                ];
+            })->toArray()
+        ]);
 
         return response()->json($appointments);
     }

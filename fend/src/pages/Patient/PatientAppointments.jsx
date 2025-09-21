@@ -24,12 +24,39 @@ function PatientAppointments() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage]);
 
+  // Refresh appointments when user returns to the page (e.g., after payment)
+  useEffect(() => {
+    const handleFocus = () => {
+      console.log('Page focused, refreshing appointments...');
+      fetchAppointments(currentPage);
+    };
+
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('Page visible, refreshing appointments...');
+        fetchAppointments(currentPage);
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [currentPage]);
+
   const fetchAppointments = async (page = 1) => {
     try {
       const res = await api.get(`/api/user-appointments?page=${page}`, {
         // this route often probes auth; ignore 401 auto-redirects
         skip401Handler: true,
       });
+      
+      // Debug: Log the response to see payment status
+      console.log('Appointments API Response:', res.data.data);
+      
       setAppointments(res.data.data);
       setMeta({
         current_page: res.data.current_page,
@@ -102,7 +129,16 @@ function PatientAppointments() {
 
   return (
     <div className="container mt-4">
-      <h3>📋 My Appointments</h3>
+      <div className="d-flex justify-content-between align-items-center mb-3">
+        <h3>📋 My Appointments</h3>
+        <button 
+          className="btn btn-outline-primary btn-sm"
+          onClick={() => fetchAppointments(currentPage)}
+          disabled={loading}
+        >
+          {loading ? "Refreshing..." : "🔄 Refresh"}
+        </button>
+      </div>
 
       {loading && <LoadingSpinner message="Loading appointments..." />}
 
