@@ -2,21 +2,20 @@
 
 namespace App\Http\Controllers\API;
 
-use App\Http\Controllers\Controller;
 use App\Models\Payment;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use Illuminate\Support\Facades\Http;
 
 class MayaController extends Controller
 {
     /**
-     * Create Pay with Maya (Wallet) one-time payment via PayBy API.
-     * Uses your **Pay with Maya** sandbox keys.
-     *
-     * Endpoint (configurable): POST {MAYA_BASE}{MAYA_PAYBY_CREATE_PATH}
+     * Create Pay with Maya (Wallet) one-time payment via PayBy API (PUBLIC sandbox).
      * Auth: Basic <base64(PUBLIC_KEY:)>
-     * Response: { paymentId, redirectUrl, ... }
+     * Response: { paymentId, redirectUrl }
      */
     public function createPayment(Request $request)
     {
@@ -38,36 +37,40 @@ class MayaController extends Controller
             'reference_no' => 'PAY-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(6)),
             'created_by' => auth()->id(),
         ]);
-        \Log::info('payments.db', [
-            'db' => \DB::selectOne('select database() as db')->db
-        ]);
-        
 
-        // PUBLIC key for create (Basic <base64(publicKey:)>)
+        Log::info('payments.db', [
+            'db' => DB::selectOne('select database() as db')->db
+        ]);
+
+        // PUBLIC key for create
         $publicKey = (string) config('services.maya.public');
 
         // Base PayMaya host
         $baseUrl = rtrim(env('MAYA_BASE', 'https://pg-sandbox.paymaya.com'), '/');
-        $createPath = env('MAYA_PAYBY_CREATE_PATH'); // try exact product path first if set
+        $createPath = env('MAYA_PAYBY_CREATE_PATH');
 
-        // ---------- Resolve redirect URLs (must be absolute HTTPS) ----------
-        // IMPORTANT: Don't rely on env() for APP/FRONTEND when config is cached.
-        // Use config('app.url') as a reliable base and allow MAYA_*_URL env to override.
-        $baseHost = rtrim((string) config('app.url'), '/'); 
+        // ---------- Resolve redirect URLs (absolute HTTPS) ----------
+        $baseHost = rtrim((string) config('app.url'), '/');
 
-        // If MAYA_*_URL envs are set, use them; otherwise derive from APP_URL
-        $successUrl = env('MAYA_SUCCESS_URL') ?: ($baseHost . '/app/pay/success');
-        $failureUrl = env('MAYA_FAILURE_URL') ?: ($baseHost . '/app/pay/failure');
-        $cancelUrl = env('MAYA_CANCEL_URL') ?: ($baseHost . '/app/pay/cancel');
+        // We’ll route returns through API so Laravel can log/poll, then redirect to SPA.
+        $successUrl = $baseHost . '/api/maya/return/success';
+        $failureUrl = $baseHost . '/api/maya/return/failure';
+        $cancelUrl = $baseHost . '/api/maya/return/cancel';
 
-        \Log::info('maya.redirects.resolved', [
+        // Append our own reference so we can find the Payment on return
+        $ref = $payment->reference_no;
+        $successUrl .= (str_contains($successUrl, '?') ? '&' : '?') . 'ref=' . urlencode($ref);
+        $failureUrl .= (str_contains($failureUrl, '?') ? '&' : '?') . 'ref=' . urlencode($ref);
+        $cancelUrl .= (str_contains($cancelUrl, '?') ? '&' : '?') . 'ref=' . urlencode($ref);
+
+        Log::info('maya.redirects.resolved', [
             'baseHost' => $baseHost,
             'successUrl' => $successUrl,
             'failureUrl' => $failureUrl,
             'cancelUrl' => $cancelUrl,
+            'ref' => $ref,
         ]);
 
-        // Minimal URL validation (must be https, with host)
         foreach (['success' => $successUrl, 'failure' => $failureUrl, 'cancel' => $cancelUrl] as $label => $u) {
             $parts = parse_url($u);
             $ok = $u
@@ -85,7 +88,7 @@ class MayaController extends Controller
         // ---------- Build payload (PayBy expects totalAmount.value) ----------
         $payload = [
             'totalAmount' => [
-                'value' => number_format((float) $payment->amount_due, 2, '.', ''), // <-- "value", not "amount"
+                'value' => number_format((float) $payment->amount_due, 2, '.', ''),
                 'currency' => $payment->currency,
             ],
             'requestReferenceNumber' => $payment->reference_no,
@@ -106,28 +109,24 @@ class MayaController extends Controller
             ],
         ];
 
-        \Log::info('maya.payby.payload.preview', [
+        Log::info('maya.payby.payload.preview', [
             'totalAmount' => $payload['totalAmount'],
             'redirectUrl' => $payload['redirectUrl'],
         ]);
 
         // ---------- Endpoint candidates ----------
         $candidates = $createPath && is_string($createPath) && $createPath !== ''
-            ? [$createPath]  // try configured product path first
+            ? [$createPath]
             : [
                 '/payby/v2/paymaya/payments',
                 '/payby/v2/payments',
-                // Add more if your sandbox product requires it:
-                // '/payments/v1/paymaya/payments',
-                // '/wallet/v2/payments',
-                // '/payments/v2/wallet/payments',
             ];
 
         $lastResp = null;
 
         foreach ($candidates as $path) {
             $endpoint = $baseUrl . $path;
-            \Log::info('maya.payby.try', ['endpoint' => $endpoint]);
+            Log::info('maya.payby.try', ['endpoint' => $endpoint]);
 
             $resp = Http::withHeaders([
                 'Authorization' => 'Basic ' . base64_encode($publicKey . ':'),
@@ -137,7 +136,7 @@ class MayaController extends Controller
                 'X-Request-Id' => (string) Str::uuid(),
             ])->post($endpoint, $payload);
 
-            \Log::info('maya.payby.response', [
+            Log::info('maya.payby.response', [
                 'endpoint' => $endpoint,
                 'status' => $resp->status(),
                 'body' => $resp->json() ?: $resp->body(),
@@ -161,7 +160,6 @@ class MayaController extends Controller
 
             $lastResp = $resp;
 
-            // If it's not clearly a "wrong endpoint" (401/404/K004/K007), stop retrying
             $body = $resp->json();
             $code = is_array($body) ? ($body['code'] ?? null) : null;
             if (!in_array($resp->status(), [401, 404]) && !in_array($code, ['K004', 'K007'])) {
@@ -182,15 +180,109 @@ class MayaController extends Controller
     }
 
     /**
-     * Optional: Poll wallet payment status (uses SECRET key).
-     * Path varies by product → make it configurable.
+     * Browser return handler (public sandbox).
+     * - Reads ?ref=PAY-...
+     * - Finds the Payment
+     * - Polls PUBLIC-Key status API a few times
+     * - Marks paid if Maya says SUCCESS/APPROVED
+     * - Redirects to your SPA routes
+     */
+    public function returnCapture(Request $request, string $outcome)
+    {
+        Log::info('maya.return.' . $outcome, [
+            'full_url' => $request->fullUrl(),
+            'query' => $request->query(),
+        ]);
+
+        $ref = $request->query('ref');
+        $payment = $ref ? Payment::where('reference_no', $ref)->first() : null;
+
+        if ($payment && $payment->maya_payment_id && $payment->status !== 'paid') {
+            $poll = $this->pollMayaStatusPublic($payment->maya_payment_id, attempts: 3);
+
+            Log::info('maya.return.poll_result', [
+                'payment_id' => $payment->id,
+                'reference_no' => $payment->reference_no,
+                'outcome' => $outcome,
+                'poll_ok' => $poll['ok'],
+                'poll_body' => $poll['body'] ?? null,
+            ]);
+
+            if ($poll['ok']) {
+                $payment->update([
+                    'status' => 'paid',
+                    'amount_paid' => $payment->amount_due,
+                    'paid_at' => now(),
+                    'webhook_last_payload' => $poll['body'], // keep last proof
+                ]);
+                if ($payment->appointment_id) {
+                    $payment->appointment()->update(['payment_status' => 'paid']);
+                }
+                Log::info('maya.status.public.mark_paid', ['payment_id' => $payment->id]);
+            }
+        } elseif (!$payment) {
+            Log::warning('maya.return.payment_not_found', ['ref' => $ref]);
+        }
+
+        // Send user to SPA
+        $target = match (true) {
+            $payment && $payment->status === 'paid' => env('MAYA_SUCCESS_URL') ?: (config('app.url') . '/app/pay/success'),
+            $outcome === 'cancel' => env('MAYA_CANCEL_URL') ?: (config('app.url') . '/app/pay/cancel'),
+            default => env('MAYA_FAILURE_URL') ?: (config('app.url') . '/app/pay/failure'),
+        };
+        return redirect()->away($target);
+    }
+
+    /**
+     * PUBLIC-key status poll for public sandbox (no webhooks).
+     * Returns ['ok'=>bool, 'body'=>array].
+     */
+    private function pollMayaStatusPublic(string $mayaPaymentId, int $attempts = 3, int $delayMs = 800): array
+    {
+        $publicKey = (string) config('services.maya.public'); // PUBLIC key
+        if (!$publicKey) {
+            Log::warning('maya.poll.public.no_public_key');
+            return ['ok' => false, 'body' => []];
+        }
+
+        $baseUrl = rtrim(env('MAYA_BASE', 'https://pg-sandbox.paymaya.com'), '/');
+        $statusPath = '/payments/v1/payments/{id}/status'; // public-status endpoint
+        $endpoint = $baseUrl . str_replace('{id}', urlencode($mayaPaymentId), $statusPath);
+
+        for ($i = 1; $i <= $attempts; $i++) {
+            $resp = Http::withHeaders([
+                'Authorization' => 'Basic ' . base64_encode($publicKey . ':'),
+                'Accept' => 'application/json',
+            ])->get($endpoint);
+
+            $json = $resp->json() ?: ['raw' => $resp->body()];
+            $status = is_array($json) ? ($json['status'] ?? null) : null;
+
+            Log::info('maya.status.public.try', [
+                'attempt' => $i,
+                'http_status' => $resp->status(),
+                'body' => $json,
+            ]);
+
+            if (in_array($status, ['SUCCESS', 'APPROVED', 'PAYMENT_SUCCESS'], true)) {
+                return ['ok' => true, 'body' => $json];
+            }
+
+            usleep($delayMs * 1000);
+            $delayMs = (int) min(4000, $delayMs * 2); // 0.8s → 1.6s → 3.2s
+        }
+
+        return ['ok' => false, 'body' => []];
+    }
+
+    /**
+     * (Kept) Secret-key status (useful if you add an admin "recheck" button)
      */
     public function status(string $paymentId)
     {
         $secretKey = (string) config('services.maya.secret');
         $baseUrl = rtrim(env('MAYA_BASE', 'https://pg-sandbox.paymaya.com'), '/');
         $statusPath = env('MAYA_STATUS_PATH', '/payments/v1/payments/{id}/status');
-
         $endpoint = $baseUrl . str_replace('{id}', urlencode($paymentId), $statusPath);
 
         $resp = Http::withHeaders([
@@ -198,7 +290,7 @@ class MayaController extends Controller
             'Accept' => 'application/json',
         ])->get($endpoint);
 
-        \Log::info('maya.payby.status.response', [
+        Log::info('maya.payby.status.response', [
             'status' => $resp->status(),
             'body' => $resp->json() ?: $resp->body(),
         ]);
@@ -207,20 +299,17 @@ class MayaController extends Controller
     }
 
     /**
-     * Webhook receiver (production best-practice).
-     * Configure your Pay with Maya wallet webhook to post here.
+     * Webhook (unused in public sandbox, kept for future prod)
      */
     public function webhook(Request $request)
     {
+        // In public sandbox there’s no dashboard/webhook registration.
+        // Keeping this for when you switch to production.
         $payload = $request->json()->all();
-
         $mayaPaymentId = $payload['paymentId'] ?? ($payload['id'] ?? null);
         $status = $payload['status'] ?? null;
 
-        $payment = $mayaPaymentId
-            ? Payment::where('maya_payment_id', $mayaPaymentId)->first()
-            : null;
-
+        $payment = $mayaPaymentId ? Payment::where('maya_payment_id', $mayaPaymentId)->first() : null;
         if ($payment) {
             $updates = [
                 'webhook_last_payload' => $payload,

@@ -197,10 +197,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/maya/payments/{paymentId}/status', [MayaController::class, 'status']);
 
     // HMO
-    Route::get('/patients/{patient}/hmos',             [PatientHmoController::class, 'index'])->name('hmos.index');
-    Route::post('/patients/{patient}/hmos',            [PatientHmoController::class, 'store'])->name('hmos.store');
-    Route::put('/patients/{patient}/hmos/{hmo}',       [PatientHmoController::class, 'update'])->name('hmos.update');
-    Route::delete('/patients/{patient}/hmos/{hmo}',    [PatientHmoController::class, 'destroy'])->name('hmos.destroy');
+    Route::get('/patients/{patient}/hmos', [PatientHmoController::class, 'index'])->name('hmos.index');
+    Route::post('/patients/{patient}/hmos', [PatientHmoController::class, 'store'])->name('hmos.store');
+    Route::put('/patients/{patient}/hmos/{hmo}', [PatientHmoController::class, 'update'])->name('hmos.update');
+    Route::delete('/patients/{patient}/hmos/{hmo}', [PatientHmoController::class, 'destroy'])->name('hmos.destroy');
 });
 
 // ------------------------
@@ -208,7 +208,7 @@ Route::middleware('auth:sanctum')->group(function () {
 // ------------------------
 Route::middleware(['auth:sanctum', EnsureDeviceIsApproved::class])->group(function () {
     // Patients
-    
+
     Route::post('/patients', [PatientController::class, 'store']);
     Route::post('/patients/{patient}/link', [PatientController::class, 'linkToUser']);
     Route::post('/patients/{id}/flag', [PatientController::class, 'flagReview']);
@@ -242,3 +242,7 @@ Route::middleware('auth:sanctum')->get('/services', [ServiceController::class, '
 Route::middleware('auth:sanctum')->get('/services/{service}', [ServiceController::class, 'show']);
 Route::post('/maya/webhook', [MayaController::class, 'webhook'])
     ->middleware('throttle:120,1');
+
+Route::get('/maya/return/success', [MayaController::class, 'returnCapture'])->defaults('outcome', 'success');
+Route::get('/maya/return/failure', [MayaController::class, 'returnCapture'])->defaults('outcome', 'failure');
+Route::get('/maya/return/cancel', [MayaController::class, 'returnCapture'])->defaults('outcome', 'cancel');
