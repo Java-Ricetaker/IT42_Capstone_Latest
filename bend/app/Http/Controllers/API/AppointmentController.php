@@ -66,37 +66,11 @@ class AppointmentController extends Controller
         return response()->json(['message' => 'Selected time is outside clinic hours.'], 422);
     }
 
-    // build usage map (pending+approved)
-    $slotUsage = array_fill_keys($grid, 0);
-    $appointments = Appointment::whereDate('date', $dateStr)
-        ->whereIn('status', ['pending', 'approved'])
-        ->get(['time_slot']);
-
-    foreach ($appointments as $appt) {
-        if (!$appt->time_slot || strpos($appt->time_slot, '-') === false) continue;
-
-        [$aStart, $aEnd] = explode('-', $appt->time_slot, 2);
-        $aStart = $this->normalizeTime(trim($aStart));
-        $aEnd   = $this->normalizeTime(trim($aEnd));
-
-        $cur = Carbon::createFromFormat('H:i', $aStart);
-        $end = Carbon::createFromFormat('H:i', $aEnd);
-
-        while ($cur->lt($end)) {
-            $k = $cur->format('H:i');
-            if (isset($slotUsage[$k])) $slotUsage[$k] += 1;
-            $cur->addMinutes(30);
-        }
-    }
-
-    // per-block capacity check
-    $cursor = $startTime->copy();
-    for ($i = 0; $i < $blocksNeeded; $i++) {
-        $k = $cursor->format('H:i');
-        if (!array_key_exists($k, $slotUsage) || $slotUsage[$k] >= $cap) {
-            return response()->json(['message' => "Time slot starting at {$k} is already full."], 422);
-        }
-        $cursor->addMinutes(30);
+    // capacity check (pending + approved)
+    $capCheck = $this->checkCapacity($service, $dateStr, $startTime->format('H:i'));
+    if (!$capCheck['ok']) {
+        $fullAt = $capCheck['full_at'] ?? $startTime->format('H:i');
+        return response()->json(['message' => "Time slot starting at {$fullAt} is already full."], 422);
     }
 
     // resolve booking patient by the authenticated user
@@ -171,6 +145,29 @@ class AppointmentController extends Controller
 
         if ($appointment->status !== 'pending') {
             return response()->json(['error' => 'Appointment already processed.'], 422);
+        }
+
+        // Enforce capacity on approval
+        $start = $appointment->time_slot && strpos($appointment->time_slot, '-') !== false
+            ? trim(explode('-', $appointment->time_slot, 2)[0])
+            : null;
+
+        if ($start) {
+            $capCheck = $this->checkCapacity($appointment->service, $appointment->date, $start);
+            if (!$capCheck['ok']) {
+                SystemLog::create([
+                    'user_id' => auth()->id(),
+                    'category' => 'appointment',
+                    'action' => 'approve_failed_capacity',
+                    'message' => 'Staff ' . auth()->user()->name . ' attempted to approve appointment #' . $appointment->id . ' but slot is full',
+                    'context' => [
+                        'appointment_id' => $appointment->id,
+                        'date' => $appointment->date,
+                        'time_slot' => $appointment->time_slot,
+                    ],
+                ]);
+                return response()->json(['message' => 'Cannot approve: slot is fully booked.'], 422);
+            }
         }
 
         $from = $appointment->status;
@@ -464,6 +461,58 @@ class AppointmentController extends Controller
         }
         // handles "HH:MM" or "HH:MM:SS"
         return Carbon::createFromFormat(strlen($time) === 8 ? 'H:i:s' : 'H:i', $time)->format('H:i');
+    }
+
+    /**
+     * Check per-block capacity for a given service, date (Y-m-d) and start time (H:i or H:i:s).
+     * Returns [ 'ok' => bool, 'full_at' => 'HH:MM' ]
+     */
+    private function checkCapacity(Service $service, string $dateStr, string $startRaw): array
+    {
+        $resolver = app(ClinicDateResolverService::class);
+        $date = Carbon::createFromFormat('Y-m-d', $dateStr)->startOfDay();
+        $snap = $resolver->resolve($date);
+
+        $grid = ClinicDateResolverService::buildBlocks($snap['open_time'], $snap['close_time']);
+        $cap = (int) $snap['effective_capacity'];
+
+        $startTime = Carbon::createFromFormat('H:i', $this->normalizeTime($startRaw));
+        $blocksNeeded = (int) max(1, ceil(($service->estimated_minutes ?? 30) / 30));
+
+        // build usage map for the date (pending + approved)
+        $slotUsage = array_fill_keys($grid, 0);
+        $appointments = Appointment::whereDate('date', $dateStr)
+            ->whereIn('status', ['pending', 'approved'])
+            ->get(['time_slot']);
+
+        foreach ($appointments as $appt) {
+            if (!$appt->time_slot || strpos($appt->time_slot, '-') === false) continue;
+
+            [$aStart, $aEnd] = explode('-', $appt->time_slot, 2);
+            $aStart = $this->normalizeTime(trim($aStart));
+            $aEnd   = $this->normalizeTime(trim($aEnd));
+
+            $cur = Carbon::createFromFormat('H:i', $aStart);
+            $end = Carbon::createFromFormat('H:i', $aEnd);
+
+            while ($cur->lt($end)) {
+                $k = $cur->format('H:i');
+                if (isset($slotUsage[$k])) $slotUsage[$k] += 1;
+                $cur->addMinutes(30);
+            }
+        }
+
+        // per-block capacity check
+        $cursor = $startTime->copy();
+        for ($i = 0; $i < $blocksNeeded; $i++) {
+            $k = $cursor->format('H:i');
+            if (!array_key_exists($k, $slotUsage) || $slotUsage[$k] >= $cap) {
+                return ['ok' => false, 'full_at' => $k];
+            }
+            $cursor->addMinutes(30);
+        }
+
+        return ['ok' => true];
     }
 
     /**
