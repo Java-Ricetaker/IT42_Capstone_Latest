@@ -43,7 +43,11 @@ export default function StaffAppointmentManager() {
       fetchAppointments();
     } catch (err) {
       console.error("Approve error:", err.response?.data || err.message);
-      alert(err.response?.data?.error || "Approval failed");
+      alert(
+        err.response?.data?.message ||
+        err.response?.data?.error ||
+        "Approval failed"
+      );
     } finally {
       setProcessingId(null);
     }
