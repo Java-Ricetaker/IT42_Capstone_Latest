@@ -32,6 +32,7 @@ use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\API\ClinicWeeklyScheduleController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Admin\SystemLogController;
+use App\Http\Controllers\API\ReportController;
 
 // ------------------------
 // Public auth routes
@@ -130,6 +131,11 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
         Route::get('/filter-options', [SystemLogController::class, 'filterOptions']);
         Route::get('/statistics', [SystemLogController::class, 'statistics']);
         Route::get('/{systemLog}', [SystemLogController::class, 'show']);
+    });
+
+    // Reports
+    Route::prefix('reports')->group(function () {
+        Route::get('/visits-monthly', [ReportController::class, 'visitsMonthly']);
     });
 });
 
