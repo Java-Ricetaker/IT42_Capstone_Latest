@@ -65,7 +65,7 @@ class ReportController extends Controller
         // By service
         $byServiceRows = (clone $base)
             ->leftJoin('services as s', 's.id', '=', 'v.service_id')
-            ->selectRaw('v.service_id, COALESCE(s.name, \"(Unspecified)\") as service_name, COUNT(*) as count')
+            ->selectRaw("v.service_id, COALESCE(s.name, '(Unspecified)') as service_name, COUNT(*) as count")
             ->groupBy('v.service_id', 's.name')
             ->orderByDesc('count')
             ->get();
