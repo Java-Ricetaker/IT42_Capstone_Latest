@@ -1,78 +1,32 @@
 import { useEffect, useMemo, useState } from "react";
 import api from "../../api/api";
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  Title as ChartTitle,
+  Tooltip as ChartTooltip,
+  Legend as ChartLegend,
+} from "chart.js";
+import ChartDataLabels from "chartjs-plugin-datalabels";
+import { Line, Bar, Doughnut } from "react-chartjs-2";
 
-// Minimal, dependency-free charts using inline SVG to avoid adding new libs
-function LineChart({ data, width = 640, height = 220, labelKey = "day", valueKey = "count" }) {
-  const padding = 32;
-  const points = useMemo(() => {
-    if (!Array.isArray(data) || data.length === 0) return [];
-    const xs = data.map((_, i) => i);
-    const ys = data.map((d) => Number(d[valueKey]) || 0);
-    const maxY = Math.max(1, ...ys);
-    const innerW = width - padding * 2;
-    const innerH = height - padding * 2;
-    return ys.map((y, i) => {
-      const x = padding + (i / Math.max(1, data.length - 1)) * innerW;
-      const yy = padding + innerH - (y / maxY) * innerH;
-      return [x, yy];
-    });
-  }, [data, height, padding, valueKey, width]);
-
-  const path = points
-    .map((p, i) => (i === 0 ? `M ${p[0]},${p[1]}` : `L ${p[0]},${p[1]}`))
-    .join(" ");
-
-  return (
-    <svg width={width} height={height} className="w-100 border rounded bg-white">
-      <polyline fill="none" stroke="#0d6efd" strokeWidth="2" points={points.map((p) => p.join(",")).join(" ")} />
-      <path d={path} fill="none" stroke="#0d6efd" strokeWidth="2" />
-    </svg>
-  );
-}
-
-function BarChart({ data, width = 640, height = 220, labelKey = "label", valueKey = "count" }) {
-  const padding = 32;
-  const innerW = width - padding * 2;
-  const innerH = height - padding * 2;
-  const values = data.map((d) => Number(d[valueKey]) || 0);
-  const maxY = Math.max(1, ...values);
-  const barW = data.length ? innerW / data.length - 6 : 0;
-  return (
-    <svg width={width} height={height} className="w-100 border rounded bg-white">
-      {data.map((d, i) => {
-        const v = Number(d[valueKey]) || 0;
-        const h = (v / maxY) * innerH;
-        const x = padding + i * (barW + 6);
-        const y = padding + (innerH - h);
-        return <rect key={i} x={x} y={y} width={barW} height={h} fill="#198754" />;
-      })}
-    </svg>
-  );
-}
-
-function PieChart({ data, valueKey = "count", colors = ["#0d6efd", "#6c757d", "#198754", "#dc3545", "#ffc107"] }) {
-  const total = data.reduce((s, d) => s + (Number(d[valueKey]) || 0), 0) || 1;
-  let angle = 0;
-  const radius = 90;
-  const cx = 110;
-  const cy = 110;
-  return (
-    <svg width={220} height={220} className="border rounded bg-white">
-      {data.map((d, i) => {
-        const val = Number(d[valueKey]) || 0;
-        const a = (val / total) * Math.PI * 2;
-        const x1 = cx + radius * Math.cos(angle);
-        const y1 = cy + radius * Math.sin(angle);
-        const x2 = cx + radius * Math.cos(angle + a);
-        const y2 = cy + radius * Math.sin(angle + a);
-        const large = a > Math.PI ? 1 : 0;
-        const path = `M ${cx} ${cy} L ${x1} ${y1} A ${radius} ${radius} 0 ${large} 1 ${x2} ${y2} Z`;
-        angle += a;
-        return <path key={i} d={path} fill={colors[i % colors.length]} />;
-      })}
-    </svg>
-  );
-}
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  BarElement,
+  ArcElement,
+  ChartTitle,
+  ChartTooltip,
+  ChartLegend,
+  ChartDataLabels
+);
 
 export default function AdminMonthlyReport() {
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
@@ -123,6 +77,158 @@ export default function AdminMonthlyReport() {
   const byService = useMemo(() => {
     return (data.by_service || []).map((r) => ({ label: r.service_name || "(Unspecified)", count: Number(r.count) || 0 }));
   }, [data.by_service]);
+
+  // ------ Chart helpers ------
+  const visitTypeColorMap = useMemo(() => ({
+    appointment: "#6c757d", // gray
+    walkin: "#0d6efd", // blue
+  }), []);
+
+  const getVisitTypeColors = (items) =>
+    items.map((it, i) => visitTypeColorMap[it.label] || [
+      "#0d6efd",
+      "#6c757d",
+      "#198754",
+      "#dc3545",
+      "#ffc107",
+      "#20c997",
+      "#6610f2",
+    ][i % 7]);
+
+  const lineData = useMemo(() => ({
+    labels: byDay.map((d) => d.day),
+    datasets: [
+      {
+        label: "Visits",
+        data: byDay.map((d) => d.count),
+        borderColor: "#0d6efd",
+        backgroundColor: "rgba(13,110,253,0.15)",
+        tension: 0.3,
+        pointRadius: 3,
+        fill: true,
+      },
+    ],
+  }), [byDay]);
+
+  const lineOptions = useMemo(() => ({
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: true },
+      datalabels: { display: false },
+      title: { display: false },
+    },
+    scales: {
+      x: { title: { display: true, text: "Day" } },
+      y: { title: { display: true, text: "Visits" }, beginAtZero: true, ticks: { precision: 0 } },
+    },
+  }), []);
+
+  const hourBarData = useMemo(() => ({
+    labels: byHour.map((d) => d.label),
+    datasets: [
+      {
+        label: "Visits",
+        data: byHour.map((d) => d.count),
+        backgroundColor: "rgba(25,135,84,0.85)",
+        borderColor: "#198754",
+        borderWidth: 1,
+      },
+    ],
+  }), [byHour]);
+
+  const defaultDatalabels = {
+    color: "#fff",
+    font: { weight: "bold" },
+    formatter: (v) => (v > 0 ? v : ""),
+  };
+
+  const hourBarOptions = useMemo(() => ({
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: true },
+      datalabels: {
+        anchor: "end",
+        align: "end",
+        offset: 2,
+        ...defaultDatalabels,
+      },
+    },
+    scales: {
+      x: { title: { display: true, text: "Hour of Day" } },
+      y: { title: { display: true, text: "Visits" }, beginAtZero: true, ticks: { precision: 0 } },
+    },
+  }), []);
+
+  const serviceBarData = useMemo(() => ({
+    labels: byService.map((d) => d.label),
+    datasets: [
+      {
+        label: "Visits",
+        data: byService.map((d) => d.count),
+        backgroundColor: "rgba(25,135,84,0.85)",
+        borderColor: "#198754",
+        borderWidth: 1,
+      },
+    ],
+  }), [byService]);
+
+  const serviceBarOptions = useMemo(() => ({
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: true },
+      datalabels: {
+        anchor: "end",
+        align: "end",
+        offset: 2,
+        ...defaultDatalabels,
+      },
+    },
+    scales: {
+      x: {
+        title: { display: true, text: "Service" },
+        ticks: { autoSkip: false, maxRotation: 60, minRotation: 30 },
+      },
+      y: { title: { display: true, text: "Visits" }, beginAtZero: true, ticks: { precision: 0 } },
+    },
+  }), []);
+
+  const visitTypeData = useMemo(() => {
+    const labels = visitType.map((v) => v.label);
+    const values = visitType.map((v) => v.count);
+    const colors = getVisitTypeColors(visitType);
+    return {
+      labels,
+      datasets: [
+        {
+          label: "Visit Type",
+          data: values,
+          backgroundColor: colors,
+          borderWidth: 0,
+        },
+      ],
+    };
+  }, [visitType]);
+
+  const totalVisitType = useMemo(() => visitType.reduce((s, r) => s + r.count, 0) || 1, [visitType]);
+
+  const visitTypeOptions = useMemo(() => ({
+    responsive: true,
+    plugins: {
+      legend: { display: false },
+      tooltip: { enabled: true },
+      datalabels: {
+        color: "#fff",
+        formatter: (value) => {
+          if (!value) return "";
+          const pct = Math.round((value / totalVisitType) * 100);
+          return `${value} (${pct}%)`;
+        },
+      },
+    },
+  }), [totalVisitType]);
 
   const downloadPdf = async () => {
     try {
@@ -231,7 +337,7 @@ export default function AdminMonthlyReport() {
               <div className="card">
                 <div className="card-header">Daily Counts</div>
                 <div className="card-body">
-                  <LineChart data={byDay} />
+                  <Line data={lineData} options={lineOptions} height={80} />
                 </div>
               </div>
             </div>
@@ -239,7 +345,7 @@ export default function AdminMonthlyReport() {
               <div className="card">
                 <div className="card-header">By Hour</div>
                 <div className="card-body">
-                  <BarChart data={byHour} />
+                  <Bar data={hourBarData} options={hourBarOptions} height={80} />
                 </div>
               </div>
             </div>
@@ -247,15 +353,18 @@ export default function AdminMonthlyReport() {
               <div className="card">
                 <div className="card-header">Visit Type</div>
                 <div className="card-body d-flex align-items-center justify-content-center">
-                  <PieChart data={visitType} />
+                  <Doughnut data={visitTypeData} options={visitTypeOptions} width={220} height={220} />
                   <div className="ms-3">
-                    {visitType.map((v) => (
-                      <div key={v.label} className="d-flex align-items-center mb-1">
-                        <span className="badge text-bg-secondary me-2" style={{ width: 16 }}>&nbsp;</span>
-                        <span className="me-2" style={{ minWidth: 90 }}>{v.label}</span>
-                        <strong>{v.count}</strong>
-                      </div>
-                    ))}
+                    {visitType.map((v, idx) => {
+                      const color = getVisitTypeColors(visitType)[idx];
+                      return (
+                        <div key={v.label} className="d-flex align-items-center mb-1">
+                          <span className="me-2" style={{ display: "inline-block", width: 14, height: 14, backgroundColor: color, borderRadius: 3 }} />
+                          <span className="me-2" style={{ minWidth: 100 }}>{v.label}</span>
+                          <strong>{v.count}</strong>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -264,7 +373,7 @@ export default function AdminMonthlyReport() {
               <div className="card">
                 <div className="card-header">By Service</div>
                 <div className="card-body">
-                  <BarChart data={byService} />
+                  <Bar data={serviceBarData} options={serviceBarOptions} height={80} />
                 </div>
               </div>
             </div>
