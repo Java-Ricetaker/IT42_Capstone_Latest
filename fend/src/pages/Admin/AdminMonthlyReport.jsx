@@ -332,28 +332,28 @@ export default function AdminMonthlyReport() {
             </div>
           </div>
 
-          <div className="row g-3">
-            <div className="col-12">
-              <div className="card">
+          <div className="row">
+            <div className="col-12 col-md-6 mb-3">
+              <div className="card h-100">
                 <div className="card-header">Daily Counts</div>
                 <div className="card-body">
-                  <Line data={lineData} options={lineOptions} height={80} />
+                  <Line data={lineData} options={lineOptions} />
                 </div>
               </div>
             </div>
-            <div className="col-12 col-lg-6">
-              <div className="card">
+            <div className="col-12 col-md-6 mb-3">
+              <div className="card h-100">
                 <div className="card-header">By Hour</div>
                 <div className="card-body">
-                  <Bar data={hourBarData} options={hourBarOptions} height={80} />
+                  <Bar data={hourBarData} options={hourBarOptions} />
                 </div>
               </div>
             </div>
-            <div className="col-12 col-lg-6">
-              <div className="card">
+            <div className="col-12 col-md-6 mb-3">
+              <div className="card h-100">
                 <div className="card-header">Visit Type</div>
                 <div className="card-body d-flex align-items-center justify-content-center">
-                  <Doughnut data={visitTypeData} options={visitTypeOptions} width={220} height={220} />
+                  <Doughnut data={visitTypeData} options={visitTypeOptions} />
                   <div className="ms-3">
                     {visitType.map((v, idx) => {
                       const color = getVisitTypeColors(visitType)[idx];
@@ -369,11 +369,11 @@ export default function AdminMonthlyReport() {
                 </div>
               </div>
             </div>
-            <div className="col-12">
-              <div className="card">
+            <div className="col-12 col-md-6 mb-3">
+              <div className="card h-100">
                 <div className="card-header">By Service</div>
                 <div className="card-body">
-                  <Bar data={serviceBarData} options={serviceBarOptions} height={80} />
+                  <Bar data={serviceBarData} options={serviceBarOptions} />
                 </div>
               </div>
             </div>
