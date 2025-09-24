@@ -124,18 +124,41 @@ export default function AdminMonthlyReport() {
     },
   }), []);
 
+  const hourAvgMap = useMemo(() => {
+    const map = new Map();
+    for (let i = 0; i < 24; i++) map.set(i, 0);
+    (data.by_hour_avg_per_day || []).forEach((r) => {
+      const h = Number(r.hour) || 0;
+      map.set(h, Number(r.avg_per_day) || 0);
+    });
+    return map;
+  }, [data.by_hour_avg_per_day]);
+
   const hourBarData = useMemo(() => ({
     labels: byHour.map((d) => d.label),
     datasets: [
       {
-        label: "Visits",
+        label: "Total (month)",
         data: byHour.map((d) => d.count),
         backgroundColor: "rgba(25,135,84,0.85)",
         borderColor: "#198754",
         borderWidth: 1,
+        type: "bar",
+        yAxisID: "y",
+      },
+      {
+        label: "Avg per day",
+        data: byHour.map((d) => Number(hourAvgMap.get(Number(d.label)) || 0)),
+        borderColor: "#0d6efd",
+        backgroundColor: "rgba(13,110,253,0.25)",
+        borderWidth: 2,
+        pointRadius: 2,
+        tension: 0.3,
+        type: "line",
+        yAxisID: "y",
       },
     ],
-  }), [byHour]);
+  }), [byHour, hourAvgMap]);
 
   const defaultDatalabels = {
     color: "#fff",
@@ -146,7 +169,7 @@ export default function AdminMonthlyReport() {
   const hourBarOptions = useMemo(() => ({
     responsive: true,
     plugins: {
-      legend: { display: false },
+      legend: { display: true },
       tooltip: { enabled: true },
       datalabels: {
         anchor: "end",
@@ -157,7 +180,7 @@ export default function AdminMonthlyReport() {
     },
     scales: {
       x: { title: { display: true, text: "Hour of Day" } },
-      y: { title: { display: true, text: "Visits" }, beginAtZero: true, ticks: { precision: 0 } },
+      y: { title: { display: true, text: "Visits (total) / Avg per day" }, beginAtZero: true, ticks: { precision: 0 } },
     },
   }), []);
 
@@ -257,8 +280,12 @@ export default function AdminMonthlyReport() {
 
       autoTable(doc, {
         startY: (doc.lastAutoTable?.finalY || 100) + 20,
-        head: [["Hour", "Count"]],
-        body: (byHour || []).map((r) => [r.label, String(r.count)]),
+        head: [["Hour", "Total (month)", "Avg/day"]],
+        body: (byHour || []).map((r) => [
+          r.label,
+          String(r.count),
+          String((Number(hourAvgMap.get(Number(r.label)) || 0)).toFixed(2)),
+        ]),
         theme: "grid",
         styles: { fontSize: 9 },
         headStyles: { fillColor: [25, 135, 84] },

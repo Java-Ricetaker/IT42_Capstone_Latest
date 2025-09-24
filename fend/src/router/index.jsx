@@ -33,6 +33,7 @@ import PromoArchive from "../pages/Admin/PromoArchive";
 import ScheduleManager from "../pages/Admin/ScheduleManager";
 import ClinicCalendarManager from "../pages/Admin/ClinicCalendarManager";
 import AdminMonthlyReport from "../pages/Admin/AdminMonthlyReport";
+import AdminGoalsPage from "../pages/Admin/AdminGoalsPage";
 import SystemLogsPage from "../pages/Admin/SystemLogsPage";
 const DentistScheduleManager = lazy(() =>
   import("../pages/Admin/DentistScheduleManager")
@@ -95,6 +96,7 @@ export default function AppRouter() {
 
           <Route path="clinic-calendar" element={<ClinicCalendarManager />} />
           <Route path="monthly-report" element={<AdminMonthlyReport />} />
+          <Route path="goals" element={<AdminGoalsPage />} />
           <Route
             path="dentists"
             element={
