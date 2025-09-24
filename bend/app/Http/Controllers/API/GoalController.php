@@ -32,6 +32,27 @@ class GoalController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
+        // If the goal is for the current month, initialize a snapshot that
+        // includes visits that have already happened earlier this month.
+        $today = Carbon::today();
+        if ($periodStart->isSameMonth($today) && $validated['metric'] === 'total_visits') {
+            $periodEnd = (clone $periodStart)->endOfMonth();
+            $actual = DB::table('patient_visits')
+                ->whereNotNull('start_time')
+                ->whereBetween('start_time', [$periodStart, $periodEnd])
+                ->count();
+
+            GoalProgressSnapshot::updateOrCreate(
+                [
+                    'goal_id' => $goal->id,
+                    'as_of_date' => $today,
+                ],
+                [
+                    'actual_value' => $actual,
+                ]
+            );
+        }
+
         return response()->json($goal, 201);
     }
 
