@@ -24,6 +24,7 @@ class ReportController extends Controller
         }
 
         $end = (clone $start)->endOfMonth();
+        $daysInMonth = $start->daysInMonth;
 
         // Base scope: visits that started within the month
         $base = DB::table('patient_visits as v')
@@ -42,7 +43,7 @@ class ReportController extends Controller
 
         // By hour (0-23)
         $byHourRows = (clone $base)
-            ->selectRaw('HOUR(v.start_time) as hour, COUNT(*) as count')
+            ->selectRaw('HOUR(v.start_time) as hour, COUNT(*) as count, (COUNT(*) / ?) as avg_per_day', [$daysInMonth])
             ->groupBy('hour')
             ->orderBy('hour')
             ->get();
@@ -76,7 +77,18 @@ class ReportController extends Controller
                 'visits' => $totalVisits,
             ],
             'by_day' => $byDayRows,
-            'by_hour' => $byHourRows,
+            'by_hour' => $byHourRows->map(function ($r) {
+                return [
+                    'hour' => $r->hour,
+                    'count' => $r->count,
+                ];
+            }),
+            'by_hour_avg_per_day' => $byHourRows->map(function ($r) {
+                return [
+                    'hour' => $r->hour,
+                    'avg_per_day' => round((float)$r->avg_per_day, 2),
+                ];
+            }),
             'by_visit_type' => $byVisitTypeRows,
             'by_service' => $byServiceRows,
         ]);

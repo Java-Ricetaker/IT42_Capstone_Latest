@@ -33,6 +33,7 @@ use App\Http\Controllers\API\ClinicWeeklyScheduleController;
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Admin\SystemLogController;
 use App\Http\Controllers\API\ReportController;
+use App\Http\Controllers\API\GoalController;
 
 // ------------------------
 // Public auth routes
@@ -136,6 +137,13 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
     // Reports
     Route::prefix('reports')->group(function () {
         Route::get('/visits-monthly', [ReportController::class, 'visitsMonthly']);
+    });
+
+    // Performance goals
+    Route::prefix('goals')->group(function () {
+        Route::post('/', [GoalController::class, 'store']);
+        Route::get('/', [GoalController::class, 'index']);
+        Route::get('/{id}/progress', [GoalController::class, 'progress'])->whereNumber('id');
     });
 });
 

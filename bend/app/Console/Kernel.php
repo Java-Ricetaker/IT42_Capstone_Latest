@@ -13,6 +13,7 @@ class Kernel extends ConsoleKernel
     protected function schedule(Schedule $schedule): void
     {
         $schedule->command('appointments:mark-no-shows')->hourly();
+        $schedule->command('goals:update-progress')->dailyAt('01:15');
     }
 
     /**
