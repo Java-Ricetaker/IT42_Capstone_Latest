@@ -54,9 +54,13 @@ function ForgotPassword() {
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',
-          height: '100vh',
+          
+          width: "1300px",
+          height: "720px",
+          margin:"0 auto",
+       
           padding: '20px', // px for spacing
-          backgroundColor: '#f8f9fa',
+    
         }}
       >
         <div
@@ -66,7 +70,7 @@ function ForgotPassword() {
             padding: '30px',
             borderRadius: '12px',
             boxShadow: '0px 4px 12px rgba(0, 0, 0, 0.1)',
-            backgroundColor: '#fff',
+          
           }}
         >
           <h3 className="text-center mb-4">

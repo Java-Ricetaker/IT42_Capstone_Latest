@@ -5,7 +5,16 @@ function PatientLayout() {
   return (
     <div className="d-flex flex-column min-vh-100">
       <PatientNavbar />
-      <main className="flex-grow-1 container py-4">
+ {/* //--------------j */}
+      <main 
+        className="d-flex justify-content-center align-items-center text-center flex-grow-1"
+        style={{
+          width: "1300px",
+          height: "720px",
+          margin:"0 auto",
+        }}
+        
+      >
         <Outlet />
       </main>
     </div>

@@ -144,20 +144,21 @@ function BookAppointment() {
   };
 
   return (
-    <div>
-      <h3 className="mb-4">📅 Book an Appointment</h3>
-
-      <div className="mb-3">
-        <label className="form-label">Select a Date:</label>
-        <input
-          type="date"
-          className="form-control"
-          value={selectedDate}
-          onChange={handleDateChange}
-          min={tomorrowStr()}
-          max={sevenDaysOutStr()}
-        />
-      </div>
+// ----------------------------------------j
+  <div className="d-flex flex-column align-items-center justify-content-start min-vh-100 pt-3">
+  <h3 className="mb-4 text-center">📅 Book an Appointment</h3>
+  <div className="mb-3 w-100" style={{ maxWidth: "320px" }}>
+    <label className="form-label text-center w-100">Select a Date:</label>
+    <input
+      type="date"
+      className="form-control text-center"
+      value={selectedDate}
+      onChange={handleDateChange}
+      min={tomorrowStr()}
+      max={sevenDaysOutStr()}
+    />
+  </div>
+{/* //----------------------------------------j */}
 
       {loading && <LoadingSpinner message="Loading available services..." />}
       {error && <div className="alert alert-danger">{error}</div>}

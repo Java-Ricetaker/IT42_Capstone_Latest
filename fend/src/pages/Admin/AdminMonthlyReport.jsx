@@ -376,26 +376,63 @@ export default function AdminMonthlyReport() {
                 </div>
               </div>
             </div>
-            <div className="col-12 col-md-6 mb-3">
-              <div className="card h-100">
-                <div className="card-header">Visit Type</div>
-                <div className="card-body d-flex align-items-center justify-content-center">
-                  <Doughnut data={visitTypeData} options={visitTypeOptions} />
-                  <div className="ms-3">
-                    {visitType.map((v, idx) => {
-                      const color = getVisitTypeColors(visitType)[idx];
-                      return (
-                        <div key={v.label} className="d-flex align-items-center mb-1">
-                          <span className="me-2" style={{ display: "inline-block", width: 14, height: 14, backgroundColor: color, borderRadius: 3 }} />
-                          <span className="me-2" style={{ minWidth: 100 }}>{v.label}</span>
-                          <strong>{v.count}</strong>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
+  {/* //------------------------------j */}         
+{/* ----------------mas maliit na donut ---------------- */}
+<div className="col-12 col-md-4 col-lg-3 mb-3">
+  <div className="card h-100 shadow-sm">
+    <div className="card-header p-2 text-center" style={{ fontSize: "0.9rem" }}>
+      Visit Type
+    </div>
+    <div className="card-body d-flex flex-column align-items-center justify-content-center p-2">
+      <div style={{ width: "250px", height: "250px" }}>
+        <Doughnut
+          data={visitTypeData}
+          options={{
+            ...visitTypeOptions,
+            maintainAspectRatio: false,
+            cutout: "65%", 
+            plugins: {
+              legend: { display: false }, 
+              tooltip: { enabled: true },
+            },
+          }}
+        />
+      </div>
+
+      {/* Custom Legend */}
+      <div className="mt-2 w-100">
+        {visitType.map((v, idx) => {
+          const color = getVisitTypeColors(visitType)[idx];
+          return (
+            <div
+              key={v.label}
+              className="d-flex align-items-center justify-content-between"
+              style={{ fontSize: "0.75rem", marginBottom: "3px" }}
+            >
+              <span className="d-flex align-items-center">
+                <span
+                  className="me-2"
+                  style={{
+                    display: "inline-block",
+                    width: 10,
+                    height: 10,
+                    backgroundColor: color,
+                    borderRadius: 2,
+                  }}
+                />
+                {v.label}
+              </span>
+              <strong>{v.count}</strong>
             </div>
+          );
+        })}
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{/* //------------------------------j */}
             <div className="col-12 col-md-6 mb-3">
               <div className="card h-100">
                 <div className="card-header">By Service</div>
