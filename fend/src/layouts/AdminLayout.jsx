@@ -152,6 +152,18 @@ function AdminLayout() {
             </NavLink>
           </li>
 
+          {/* --- Goals --- */}
+          <li className="nav-item">
+            <NavLink
+              to="/admin/goals"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
+              🎯 Goals
+            </NavLink>
+          </li>
+
           {/* --- Reports --- */}
           <li className="nav-item">
             <NavLink
@@ -160,7 +172,19 @@ function AdminLayout() {
                 "nav-link text-white" + (isActive ? " fw-bold" : "")
               }
             >
-              📈 Monthly Report
+              📈 Monthly Visits
+            </NavLink>
+          </li>
+
+          {/* --- Analytics --- */}
+          <li className="nav-item">
+            <NavLink
+              to="/admin/analytics"
+              className={({ isActive }) =>
+                "nav-link text-white" + (isActive ? " fw-bold" : "")
+              }
+            >
+              📉 Analytics
             </NavLink>
           </li>
           
