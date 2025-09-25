@@ -139,6 +139,9 @@ Route::middleware(['auth:sanctum', AdminOnly::class])->group(function () {
         Route::get('/visits-monthly', [ReportController::class, 'visitsMonthly']);
     });
 
+    // Analytics summary
+    Route::get('/analytics/summary', [ReportController::class, 'analyticsSummary']);
+
     // Performance goals
     Route::prefix('goals')->group(function () {
         Route::post('/', [GoalController::class, 'store']);
